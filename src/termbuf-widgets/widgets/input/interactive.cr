@@ -101,4 +101,50 @@ module TermBuf::Widgets
       yield if frame.contains? event.x, event.y
     end
   end
+
+  # Moving the keyboard between the children of one widget.
+  #
+  # A group of related controls is moved between by the arrows that run along
+  # it, while tab still moves between the groups themselves. Wrapping at either
+  # end is what makes the group a closed set: tab is the way out of it, and an
+  # arrow that stopped dead at the last child would leave no way back to the
+  # first except tabbing through everything else on the screen.
+  module Stepping
+    # The children the arrows move between, in order.
+    #
+    # Whatever can take the keyboard, which leaves out a disabled control
+    # without anything here having to know what disabled means.
+    def stepped : Array(Widget)
+      children.select &.focusable?
+    end
+
+    # Moves the keyboard *step* places along `#stepped`, wrapping at either
+    # end. Does nothing when the keyboard is somewhere else entirely.
+    def step_focus(context : Context, step : Int32) : Nil
+      among = stepped
+      return if among.empty?
+
+      held = context.focus.current
+      position = held ? among.index(&.same?(held)) : nil
+      return unless position
+
+      context.focus.focus among[(position + step) % among.size]
+    end
+
+    # The two arrows that run along *direction*, bound to moving between the
+    # children. The arrows across it are left to whatever is outside.
+    def arrow_keymap(direction : Layout::Direction) : Bindings
+      back, on = case direction
+                 in .row?    then {"Left", "Right"}
+                 in .column? then {"Up", "Down"}
+                 end
+
+      Bindings.build do |map|
+        map.bind Key.parse(back), "the one before",
+          ->(context : Context) { step_focus context, -1; nil }
+        map.bind Key.parse(on), "the one after",
+          ->(context : Context) { step_focus context, 1; nil }
+      end
+    end
+  end
 end
