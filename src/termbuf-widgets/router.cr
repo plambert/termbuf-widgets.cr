@@ -222,3 +222,14 @@ module TermBuf::Widgets
     end
   end
 end
+
+# A mouse event carries a column and a row, so it is aimed at a place rather
+# than at whatever has the keyboard.
+#
+# The event is `termbuf-input`'s and stays there; this says that it is one of
+# the things `TermBuf::Widgets::Router` routes by hit test. Reopening it here
+# rather than asking the input shard to know about a layout is what keeps the
+# dependency pointing one way.
+struct TermBuf::Input::Events::Mouse
+  include TermBuf::Widgets::Positioned
+end
