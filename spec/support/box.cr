@@ -41,3 +41,24 @@ module Fixtures
     end
   end
 end
+
+module Fixtures
+  # What a row of *buffer* would paint, with trailing blanks trimmed.
+  def self.row_text(buffer : TermBuf::Buffer, row : Int32) : String
+    text = String.build do |io|
+      buffer.width.times { |column| io << buffer.back[column, row].text(buffer.clusters) }
+    end
+
+    text.rstrip ' '
+  end
+
+  # Draws *widget* into a fresh buffer *width* by *height* and gives back every
+  # row of it.
+  def self.painted(widget : TermBuf::Widgets::Widget, width : Int32, height : Int32) : Array(String)
+    buffer = TermBuf::Buffer.new width, height
+    surface = TermBuf::BufferSurface.new buffer
+    widget.draw surface.view(widget.rect)
+
+    Array.new(height) { |row| row_text buffer, row }
+  end
+end
