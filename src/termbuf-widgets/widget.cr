@@ -303,8 +303,11 @@ module TermBuf::Widgets
     def draw(view : View) : Nil
     end
 
-    # Where the terminal's cursor belongs while this widget has focus, in
-    # buffer coordinates, or `nil` when it does not want it.
+    # Where the terminal's cursor belongs while this widget has focus, or
+    # `nil` when it does not want it.
+    #
+    # In the widget's own content box, which is the box `#draw` is given, so
+    # neither a border nor padding has to be counted twice.
     def cursor_position : {Int32, Int32}?
       nil
     end

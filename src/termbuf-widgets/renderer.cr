@@ -49,7 +49,7 @@ module TermBuf::Widgets
 
       view.fill view.bounds if root || style
       widget.border.try &.draw(view, view.bounds)
-      widget.draw view
+      widget.draw view.view(inside(widget), effective)
 
       inside = clip_for widget, clip
       widget.children.each do |child|
@@ -57,6 +57,21 @@ module TermBuf::Widgets
 
         paint child, screen, inside, effective, false
       end
+    end
+
+    # A widget's content box in its own view's coordinates: its rectangle less
+    # its padding and its border.
+    #
+    # `#draw` is given this rather than the whole rectangle, because the
+    # border was already drawn around it and a widget writing at row zero of
+    # its own rectangle would write over the top edge. It is the same box the
+    # layout gave the widget's children, so a widget that draws its own
+    # content and one that holds children are working in the same coordinates.
+    private def inside(widget : Widget) : Rect
+      spacing = widget.inset
+      content = widget.content
+
+      Rect.new spacing.left, spacing.top, content.width, content.height
     end
 
     # The surface a widget draws through, cut to what its clipping ancestor

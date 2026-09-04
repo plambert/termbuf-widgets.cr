@@ -8,7 +8,7 @@ Spectator.describe TermBuf::Widgets::Renderer do
   describe "a widget in a box" do
     it "draws the border and puts the content inside it" do
       root = Box.new
-      root.border = TermBuf::Border.plain
+      root.border = TermBuf::Widgets::Border.plain
       root.add Label.new("hi")
 
       expect(Fixtures.render(root, 8, 3)).to eq ["┌──────┐", "│hi    │", "└──────┘"]
@@ -16,7 +16,7 @@ Spectator.describe TermBuf::Widgets::Renderer do
 
     it "puts a title in the top edge" do
       root = Box.new
-      root.border = TermBuf::Border.rounded title: "name"
+      root.border = TermBuf::Widgets::Border.rounded title: "name"
       root.add Label.new("hi")
 
       expect(Fixtures.render(root, 12, 3).first).to eq "╭─name─────╮"
@@ -24,7 +24,7 @@ Spectator.describe TermBuf::Widgets::Renderer do
 
     it "wraps the content to what the border left it" do
       root = Box.new
-      root.border = TermBuf::Border.plain
+      root.border = TermBuf::Widgets::Border.plain
       root.add Label.new("one two")
 
       expect(Fixtures.render(root, 7, 4)).to eq ["┌─────┐", "│one  │", "│two  │", "└─────┘"]

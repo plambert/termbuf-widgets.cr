@@ -498,7 +498,11 @@ module TermBuf::Widgets::Layout
       return if widget.hidden?
 
       if widget.leaf?
-        set_size widget, Axis::Y, Math.max(0, widget.height_for_width(widget.rect.width, policy))
+        # The width the content has, not the width of the widget: a leaf in a
+        # box wraps to what the box left it, and the inset is added back by the
+        # fitting pass that follows.
+        room = Math.max 0, widget.rect.width - inset_along(widget, Axis::X)
+        set_size widget, Axis::Y, Math.max(0, widget.height_for_width(room, policy))
       else
         widget.children.each { |child| wrap_text child, policy }
       end

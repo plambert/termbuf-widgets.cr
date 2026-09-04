@@ -138,6 +138,10 @@ module TermBuf::Widgets
     end
 
     # Where the focused widget wants the cursor, in buffer coordinates.
+    #
+    # A widget answers in its own content box, which is the box it is drawn
+    # through, so a border around it moves the cursor with everything else it
+    # holds.
     private def cursor_for_focus : {Int32, Int32}?
       widget = focused
       return if widget.nil? || widget.hidden?
@@ -145,7 +149,8 @@ module TermBuf::Widgets
       spot = widget.cursor_position
       return unless spot
 
-      {widget.rect.x + spot[0], widget.rect.y + spot[1]}
+      content = widget.content
+      {content.x + spot[0], content.y + spot[1]}
     end
   end
 end
