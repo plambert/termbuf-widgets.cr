@@ -74,7 +74,7 @@ module Fixtures
       widget.gap = @random.rand(0..2)
       widget.align_x = alignment
       widget.align_y = alignment
-      widget.border = TermBuf::Border.plain if @random.rand(4).zero?
+      widget.border = TermBuf::Widgets::Border.plain if @random.rand(4).zero?
       widget.hidden = true if @random.rand(12).zero?
     end
 

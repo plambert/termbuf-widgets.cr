@@ -140,7 +140,7 @@ Spectator.describe Layout::Engine do
 
     it "counts a border as a cell on every side" do
       root = Box.new
-      root.border = TermBuf::Border.plain
+      root.border = TermBuf::Widgets::Border.plain
       root.add Box.sized(4)
 
       Layout::Tree.new(root, Rect.full(40, 6)).layout
