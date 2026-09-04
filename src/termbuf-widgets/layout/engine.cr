@@ -1,4 +1,5 @@
 require "../widget"
+require "./floating"
 require "./sizing"
 require "./tree"
 
@@ -12,15 +13,6 @@ module TermBuf::Widgets::Layout
     def ceiling : Int32
       Math.max @max, @min
     end
-  end
-
-  # Which of the two axes a pass is working on.
-  enum Axis
-    # Columns.
-    X
-
-    # Rows.
-    Y
   end
 
   # The layout algorithm: a reimplementation, in whole cells, of the one in
@@ -53,21 +45,139 @@ module TermBuf::Widgets::Layout
 
     # Lays *tree* out. Every widget under the root comes back with a `#rect`.
     def run(tree : Tree) : Nil
-      root = tree.root
       policy = tree.policy
       screen = tree.screen
 
+      lay_out tree.root, policy, screen
+      tree.floats.each { |float| lay_out_float float, tree }
+    end
+
+    # The six passes over one subtree, laid into *area*.
+    #
+    # The root is given the area it was handed rather than the size its own
+    # `Sizing` asks for: the screen is not negotiable, and a float has had its
+    # size settled by the time it gets here.
+    private def lay_out(root : Widget, policy : Unicode::WidthPolicy, area : Rect) : Nil
       fit root, policy, Axis::X
-      root.rect = Rect.new screen.x, screen.y, screen.width, root.rect.height
+      root.rect = Rect.new area.x, area.y, area.width, root.rect.height
       distribute root, Axis::X
 
       wrap_text root, policy
 
       fit root, policy, Axis::Y
-      root.rect = Rect.new screen.x, screen.y, screen.width, screen.height
+      root.rect = area
       distribute root, Axis::Y
 
       position root
+    end
+
+    # Pass 7: one float, against whatever it is anchored to.
+    #
+    # A float is sized before it is placed, because where it goes depends on
+    # how big it turned out to be. `Fit` and `Fixed` answer for themselves;
+    # `Grow` and `Percent` have no parent box to divide, so they resolve
+    # against the anchor target instead, or against the screen when there is
+    # not one.
+    private def lay_out_float(float : Widget, tree : Tree) : Nil
+      policy = tree.policy
+      screen = tree.screen
+      floating = float.floating
+      return unless floating
+
+      reference = anchor_rect floating.anchor, tree
+      fit float, policy, Axis::X
+      width = float_extent float, Axis::X, reference.width
+      float.rect = Rect.new 0, 0, width, float.rect.height
+      distribute float, Axis::X
+
+      wrap_text float, policy
+      fit float, policy, Axis::Y
+      height = float_extent float, Axis::Y, reference.height
+
+      float.rect = place_float floating, reference, screen, width, height
+      distribute float, Axis::Y
+      position float
+    end
+
+    # What a float is placed against: its anchor target, or the screen when
+    # there is no target, or when the one there is has been hidden or taken
+    # out of the tree since.
+    private def anchor_rect(anchor : Anchor, tree : Tree) : Rect
+      target = anchor.target
+      return tree.screen unless target
+      return tree.screen if target.hidden? || !tree.holds? target
+
+      target.rect
+    end
+
+    # How big a float comes out on one axis.
+    private def float_extent(float : Widget, axis : Axis, reference : Int32) : Int32
+      sizing = sizing_of float, axis
+      value = case sizing.mode
+              in .fixed?   then sizing.min
+              in .fit?     then size_of float, axis
+              in .grow?    then Math.min reference, sizing.max
+              in .percent? then round_share sizing.weight, reference
+              end
+
+      floor = min_of float, axis
+      Math.max value.clamp(floor, Math.max(sizing.max, floor)), 0
+    end
+
+    # Where a float of *width* by *height* lands.
+    #
+    # The two attach points are laid on top of each other and the offsets
+    # applied. What happens then is the float's `Overflow`: `Flip` mirrors the
+    # pair on whichever axis went off the screen and tries again, taking the
+    # new position only if it is any better, and both rules finish by sliding
+    # the result back inside. A float wider than the screen has nowhere to
+    # slide to and sits at the left edge, where the view cuts it.
+    private def place_float(floating : Floating, reference : Rect, screen : Rect,
+                            width : Int32, height : Int32) : Rect
+      anchor = floating.anchor
+      x = attach anchor, reference, width, height, Axis::X
+      y = attach anchor, reference, width, height, Axis::Y
+
+      if floating.overflow.flip?
+        x = flip anchor, reference, screen, width, height, Axis::X, x
+        y = flip anchor, reference, screen, width, height, Axis::Y, y
+      end
+
+      Rect.new clamp_to(x, width, screen, Axis::X), clamp_to(y, height, screen, Axis::Y),
+        width, height
+    end
+
+    # Where the float's edge falls on one axis before anything is clamped.
+    private def attach(anchor : Anchor, reference : Rect, width : Int32, height : Int32,
+                       axis : Axis) : Int32
+      element = anchor.element.offset width, height
+      parent = anchor.parent.offset reference.width, reference.height
+
+      case axis
+      in .x? then reference.x + parent[0] - element[0] + anchor.dx
+      in .y? then reference.y + parent[1] - element[1] + anchor.dy
+      end
+    end
+
+    # The mirrored position, when the float does not fit where it was asked to
+    # go and mirroring is an improvement.
+    private def flip(anchor : Anchor, reference : Rect, screen : Rect,
+                     width : Int32, height : Int32, axis : Axis, at : Int32) : Int32
+      size = axis.x? ? width : height
+      return at if fits? at, size, screen, axis
+
+      mirrored = attach anchor.mirror(axis), reference, width, height, axis
+      fits?(mirrored, size, screen, axis) ? mirrored : at
+    end
+
+    private def fits?(at : Int32, size : Int32, screen : Rect, axis : Axis) : Bool
+      start = origin_of screen, axis
+      at >= start && at + size <= start + extent_of(screen, axis)
+    end
+
+    private def clamp_to(at : Int32, size : Int32, screen : Rect, axis : Axis) : Int32
+      start = origin_of screen, axis
+      Math.max start, Math.min(at, start + extent_of(screen, axis) - size)
     end
 
     # Divides *total* among *slots* in proportion to their weights, keeping
@@ -421,7 +531,7 @@ module TermBuf::Widgets::Layout
                   align_offset used, extent_of(content, axis), align_of(widget, axis)
                 end
 
-      cross = cross_axis axis
+      cross = axis.other
       cursor = origin_of(content, axis) + leading - scroll_of(widget, axis)
       base = origin_of(content, cross) - scroll_of(widget, cross)
 
@@ -468,13 +578,6 @@ module TermBuf::Widgets::Layout
     # *percent* hundredths of *total*, rounded to the nearest cell.
     private def round_share(percent : Int32, total : Int32) : Int32
       (percent * total + 50) // 100
-    end
-
-    private def cross_axis(axis : Axis) : Axis
-      case axis
-      in .x? then Axis::Y
-      in .y? then Axis::X
-      end
     end
 
     private def along_axis?(widget : Widget, axis : Axis) : Bool

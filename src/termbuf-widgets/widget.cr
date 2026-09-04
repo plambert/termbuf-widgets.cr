@@ -108,7 +108,11 @@ module TermBuf::Widgets
     layout_property scroll_y : Int32 = 0
 
     # Placement for a widget lifted out of its parent's flow, or `nil` for one
-    # laid out in it. Not resolved yet.
+    # laid out in it.
+    #
+    # A float keeps its place in the tree, which is what makes it a child of
+    # the thing it belongs to, but its parent's layout takes no space for it:
+    # it is laid out against its anchor after the rest of the tree is settled.
     layout_property floating : Layout::Floating? = nil
 
     # Whether the widget is skipped entirely: no size, no position, and no gap
@@ -172,9 +176,50 @@ module TermBuf::Widgets
       @children.empty?
     end
 
-    # The children the engine lays out: everything not `#hidden?`.
+    # The children this widget's own layout has room for: everything neither
+    # hidden nor floating. A float is laid out against its anchor instead, so
+    # its parent reserves nothing for it.
     def visible_children : Array(Widget)
-      @children.reject &.hidden?
+      @children.reject { |child| child.hidden? || child.floating }
+    end
+
+    # Whether this widget is lifted out of its parent's flow.
+    def floating? : Bool
+      !@floating.nil?
+    end
+
+    # Whether *root* is this widget or an ancestor of it, which is how a
+    # widget still in a tree is told from one taken out of it.
+    def under?(root : Widget) : Bool
+      node : Widget? = self
+      while node
+        return true if node.same? root
+
+        node = node.parent
+      end
+
+      false
+    end
+
+    # The deepest visible widget at (*x*, *y*), or `nil` when the point falls
+    # outside this one.
+    #
+    # Later children win, since they are drawn over their earlier siblings, and
+    # a floating child is skipped: a float is placed against the screen rather
+    # than inside its parent, so `Layout::Tree#hit` reaches it as a root of its
+    # own.
+    def at(x : Int32, y : Int32) : Widget?
+      return if @hidden || !@rect.contains?(x, y)
+
+      @children.reverse_each do |child|
+        next if child.floating
+
+        if found = child.at x, y
+          return found
+        end
+      end
+
+      self
     end
 
     # Adds *child* at the end and returns it.

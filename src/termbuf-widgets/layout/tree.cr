@@ -16,8 +16,13 @@ module TermBuf::Widgets::Layout
     # The widget the screen is given to.
     getter root : Widget
 
-    # Widgets lifted out of the flow, laid out against the screen rather than
-    # against a parent. Not resolved yet.
+    # Widgets lifted out of the flow, in the order they are laid out and
+    # painted: declaration order, and a float declared inside another float's
+    # subtree after the float that hosts it, so nesting resolves without a
+    # sort.
+    #
+    # Rebuilt by every `#layout`, which is what keeps it right through an
+    # `Widget#add` or a `Widget#remove` that the setter never sees.
     getter floats = [] of Widget
 
     # How grapheme clusters are measured, which is what text measurement is
@@ -76,8 +81,77 @@ module TermBuf::Widgets::Layout
     # Lays the tree out against *screen*, whether or not anything changed.
     def layout(screen : Rect = @screen) : Nil
       @screen = screen
+      collect_floats
       Engine.run self
       @dirty = false
+    end
+
+    # The roots painting order goes through: the tree itself, then every float
+    # by its `Layout::Floating#z`, lowest first, ties keeping declaration
+    # order.
+    def roots_in_z_order : Array(Widget)
+      ordered = @floats.map_with_index { |float, index| {float, index} }
+      ordered.sort! do |a, b|
+        first = a[0].floating.try(&.z) || 0
+        second = b[0].floating.try(&.z) || 0
+        first == second ? a[1] <=> b[1] : first <=> second
+      end
+
+      roots = [@root] of Widget
+      ordered.each { |pair| roots << pair[0] }
+      roots
+    end
+
+    # The deepest visible widget at (*x*, *y*), or `nil` when nothing is there.
+    #
+    # Roots are tried from the top of the painting order down, so a float takes
+    # a point over whatever it covers. A float declared `capture: false` is
+    # passed through as though it were not there, which is what a tooltip
+    # wants: it is drawn over the thing it describes but does not take its
+    # clicks.
+    def hit(x : Int32, y : Int32) : Widget?
+      roots_in_z_order.reverse_each do |candidate|
+        floating = candidate.floating
+        next if floating && !floating.capture?
+
+        if found = candidate.at x, y
+          return found
+        end
+      end
+
+      nil
+    end
+
+    # Whether *widget* is still somewhere under the root.
+    def holds?(widget : Widget) : Bool
+      widget.under? @root
+    end
+
+    # Finds every float, in the order pass 7 lays them out.
+    private def collect_floats : Nil
+      @floats.clear
+      gather @root
+
+      index = 0
+      while index < @floats.size
+        gather @floats[index]
+        index += 1
+      end
+    end
+
+    # Adds every float directly under *widget*, without descending into one:
+    # a float's own subtree is walked later, from the list, so a nested float
+    # lands after the float that hosts it.
+    private def gather(widget : Widget) : Nil
+      widget.children.each do |child|
+        next if child.hidden?
+
+        if child.floating
+          @floats << child
+        else
+          gather child
+        end
+      end
     end
 
     # Lays the tree out if anything has changed since the last one.

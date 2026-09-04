@@ -1,4 +1,21 @@
 module TermBuf::Widgets::Layout
+  # Which of the two axes a pass, an anchor or an overflow rule is working on.
+  enum Axis
+    # Columns.
+    X
+
+    # Rows.
+    Y
+
+    # The other one.
+    def other : Axis
+      case self
+      in .x? then Y
+      in .y? then X
+      end
+    end
+  end
+
   # Which way a widget stacks its children.
   enum Direction
     # Left to right.
@@ -13,17 +30,6 @@ module TermBuf::Widgets::Layout
     Start
     Center
     End
-  end
-
-  # What a floating widget does when it would land off the edge it is
-  # anchored to.
-  enum Overflow
-    # Attach to the opposite side instead, the way a menu opens upward when
-    # there is no room below.
-    Flip
-
-    # Slide back until it fits.
-    Clamp
   end
 
   # Where a run of text is allowed to break.
@@ -147,14 +153,4 @@ module TermBuf::Widgets::Layout
       io << ')'
     end
   end
-
-  # Where a widget lifted out of its parent's flow is placed.
-  #
-  # Provisional: floating widgets are not laid out yet, and this exists so the
-  # property they hang from does not have to appear later.
-  record Floating,
-    offset_x : Int32 = 0,
-    offset_y : Int32 = 0,
-    overflow_x : Overflow = Overflow::Flip,
-    overflow_y : Overflow = Overflow::Flip
 end

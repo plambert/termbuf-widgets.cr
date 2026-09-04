@@ -17,6 +17,7 @@ end
 require "./termbuf-widgets/layout/errors"
 require "./termbuf-widgets/layout/padding"
 require "./termbuf-widgets/layout/sizing"
+require "./termbuf-widgets/layout/floating"
 require "./termbuf-widgets/layout/text_measure"
 require "./termbuf-widgets/widget"
 require "./termbuf-widgets/layout/tree"
