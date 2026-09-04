@@ -19,3 +19,5 @@
 require "./display/status_bar"
 require "./display/progress_bar"
 require "./display/single_value"
+require "./display/formatted_number"
+require "./display/bytes_display"
