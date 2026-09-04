@@ -122,6 +122,18 @@ module TermBuf::Widgets
     # What the widget draws in, or `nil` to take the surface's own style.
     property style : Style? = nil
 
+    # The keys this widget answers, or `nil` for one that answers none.
+    #
+    # Every keymap in the chain from the focused widget up is offered a key at
+    # once, innermost first, so a widget's own binding beats the one its parent
+    # gives the same key.
+    property keymap : Bindings? = nil
+
+    # Where this widget's messages go: set on the root only, by the `Router`.
+    # `#emit` walks up to find it, the way `#invalidate_layout` walks up to
+    # find the tree.
+    property mailbox : Mailbox? = nil
+
     # Where the engine put this widget, in buffer coordinates.
     getter rect : Rect = Rect.new(0, 0, 0, 0)
 
@@ -300,6 +312,31 @@ module TermBuf::Widgets
     # Whether focus can land here.
     def focusable? : Bool
       false
+    end
+
+    # What this widget does with an event no binding in the chain claimed.
+    #
+    # Call `Context#consume` to stop the event here; answering without
+    # consuming lets it carry on to the parent, which is what a panel that
+    # highlights itself on a key it does not otherwise want should do.
+    def handle(event : Event, context : Context) : Nil
+    end
+
+    # Sends *message* to whatever contains this widget.
+    #
+    # It is delivered on the next `App#pump`, starting at this widget's parent,
+    # so a widget never sees its own message in the dispatch that emitted it.
+    # A widget outside a tree has nowhere to send one, and this does nothing.
+    def emit(message : Message) : Nil
+      node : Widget? = self
+      while node
+        if mailbox = node.mailbox
+          mailbox.post message, self
+          return
+        end
+
+        node = node.parent
+      end
     end
 
     # Marks the tree this widget belongs to as needing another layout.

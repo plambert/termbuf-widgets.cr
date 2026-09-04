@@ -1,4 +1,6 @@
+require "./focus"
 require "./layout/tree"
+require "./router"
 require "./renderer"
 require "./widget"
 
@@ -30,8 +32,17 @@ module TermBuf::Widgets
     # that wants it hidden.
     getter cursor : {Int32, Int32}? = nil
 
-    # The widget the cursor follows, and the one keys reach first.
-    property focused : Widget? = nil
+    # Which widget has the keyboard, and what tab moves it between.
+    getter focus : Focus::Stack
+
+    # Where events go once they are off the channel.
+    getter router : Router
+
+    # The keys the application answers after every widget in the chain has
+    # declined them. Tab and Shift+Tab live here rather than being wired into
+    # the router, so a program that wants different keys for them rebinds
+    # rather than patches.
+    getter keymap : Bindings
 
     # Called with every event the tree did not claim. What a program hangs its
     # own quit key or its resize bookkeeping from.
@@ -39,8 +50,23 @@ module TermBuf::Widgets
 
     def initialize(@screen : Drawing, root : Widget, size : Rect,
                    @events : Channel(Event) = Channel(Event).new(64),
-                   policy : Unicode::WidthPolicy = Unicode::WidthPolicy::DEFAULT)
+                   policy : Unicode::WidthPolicy = Unicode::WidthPolicy::DEFAULT,
+                   keymap : Bindings? = nil)
       @tree = Layout::Tree.new root, size, policy
+      @keymap = keymap || App.default_keymap
+      @focus = Focus::Stack.new root, @keymap
+      @router = Router.new @tree, @focus
+    end
+
+    # Moving the keyboard from one widget to the next and back, which every
+    # application wants and none should have to write.
+    def self.default_keymap : Bindings
+      Bindings.build do |map|
+        map.bind Key.parse("Tab"), "focus the next widget",
+          ->(context : Context) { context.focus.next; nil }
+        map.bind Key.parse("Shift+Tab"), "focus the previous widget",
+          ->(context : Context) { context.focus.previous; nil }
+      end
     end
 
     # The widget everything else hangs from.
@@ -48,15 +74,21 @@ module TermBuf::Widgets
       @tree.root
     end
 
-    # Points the app at a different root.
-    def root=(root : Widget) : Widget
-      @tree.root = root
+    # The widget with the keyboard.
+    def focused : Widget?
+      @focus.current
     end
 
     # Lays out whatever changed, draws the frame, and answers where the
     # terminal's cursor belongs, or `nil` to hide it.
     def frame : {Int32, Int32}?
+      # The flag that says the tree has to be laid out again is the same flag
+      # that says the tab order is stale: adding a widget, taking one out and
+      # hiding one are all invalidations.
+      stale = @tree.dirty?
       @tree.layout_if_needed
+      @focus.rebuild if stale
+
       Renderer.render @tree, @screen
       @cursor = cursor_for_focus
     end
@@ -77,7 +109,7 @@ module TermBuf::Widgets
     # Takes everything waiting on the channel, without blocking, and answers
     # how many events that was.
     def pump : Int32
-      handled = 0
+      handled = @router.drain
 
       while event = waiting
         handled += 1
@@ -97,9 +129,10 @@ module TermBuf::Widgets
       end
     end
 
-    # What the tree does with one event. `Router` takes this over.
+    # What the tree does with one event, and what happens to one it declined.
     protected def deliver(event : Event) : Nil
       resize Rect.new(0, 0, event.size.columns, event.size.rows) if event.is_a? Events::Resize
+      return if @router.dispatch event
 
       @on_event.try &.call(event)
     end
