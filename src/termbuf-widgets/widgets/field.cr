@@ -162,14 +162,19 @@ module TermBuf::Widgets
     end
 
     # Takes a key or a paste. Anything else is somebody else's.
+    #
+    # A key is claimed: nothing above a field should see what was typed into
+    # it. A paste is not, because it is news about the terminal as much as it
+    # is text: the field takes the text and whatever is showing a
+    # `PasteNotice` still gets to hear that the paste is over.
     def handle(event : Event, context : Context) : Nil
       case event
-      when Events::Key   then press event.key
-      when Events::Paste then paste event.text
-      else                    return
+      when Events::Key
+        press event.key
+        context.consume
+      when Events::Paste
+        paste event.text
       end
-
-      context.consume
     end
 
     private def announce(outcome : Editor::Outcome) : Nil

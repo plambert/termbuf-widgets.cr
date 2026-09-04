@@ -119,6 +119,23 @@ module TermBuf::Widgets
       handled
     end
 
+    # Waits for something to happen, answers it, and takes anything else that
+    # came with it. Answers `false` when the channel has closed and there is
+    # nothing more coming, which is what ends a loop.
+    #
+    #     while app.wait
+    #       app.frame { |spot| terminal.cursor.move_to *spot if spot }
+    #       terminal.paint
+    #     end
+    def wait : Bool
+      event = @events.receive?
+      return false unless event
+
+      deliver event
+      pump
+      true
+    end
+
     # One event, or `nil` when nothing is waiting and nothing is closed.
     private def waiting : Event?
       select

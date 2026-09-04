@@ -330,6 +330,17 @@ Spectator.describe TermBuf::Widgets::Field do
       expect(made.text).to eq "pasted"
     end
 
+    # A paste is news about the terminal as much as it is text, and whatever is
+    # showing a notice about it needs to hear that it ended.
+    it "lets a paste carry on to whatever is above it" do
+      app, made, root = wired
+      app.events.send TermBuf::Events::Paste.new("pasted", true)
+      app.pump
+
+      expect(made.text).to eq "pasted"
+      expect(root.seen.map(&.class)).to eq [TermBuf::Events::Paste]
+    end
+
     it "leaves anything that is not input alone" do
       app, made, root = wired
       app.events.send TermBuf::Events::Warning.new("something")
