@@ -1,4 +1,5 @@
 require "./panel"
+require "./scrolls"
 
 module TermBuf::Widgets
   # A window onto content taller or wider than itself.
@@ -16,6 +17,8 @@ module TermBuf::Widgets
   # the painter can reach for the terminal's own scrolling region instead of
   # rewriting every row. See `#draw`.
   class Scrollable < Panel
+    include Scrolls
+
     # How many cells one notch of the wheel moves.
     property wheel : Int32 = 3
 
@@ -72,19 +75,16 @@ module TermBuf::Widgets
       {box.width, box.height}
     end
 
-    # The furthest the content can be scrolled before its end is in view.
-    def max_scroll : {Int32, Int32}
-      size = content_size
-      room = viewport_size
-
-      {Math.max(size[0] - room[0], 0), Math.max(size[1] - room[1], 0)}
-    end
-
     # Moves the window by *dx* and *dy*, stopping at either end.
-    def scroll_by(dx : Int32 = 0, dy : Int32 = 0) : Nil
+    def scroll_by(dx : Int32, dy : Int32) : Nil
       limit = max_scroll
       self.scroll_x = (@scroll_x + dx).clamp(0, limit[0]) if clip_x?
       self.scroll_y = (@scroll_y + dy).clamp(0, limit[1]) if clip_y?
+    end
+
+    # :ditto:
+    def scroll_by(*, dx : Int32 = 0, dy : Int32 = 0) : Nil
+      scroll_by dx, dy
     end
 
     # Moves the window as little as it takes to bring *widget* into view.
@@ -161,15 +161,7 @@ module TermBuf::Widgets
     def handle(event : Event, context : Context) : Nil
       return unless event.is_a? Events::Mouse
 
-      case event.button
-      when .wheel_up?    then scroll_by dy: -@wheel, dx: clip_y? ? 0 : -@wheel
-      when .wheel_down?  then scroll_by dy: @wheel, dx: clip_y? ? 0 : @wheel
-      when .wheel_left?  then scroll_by dx: -@wheel
-      when .wheel_right? then scroll_by dx: @wheel
-      else                    return
-      end
-
-      context.consume
+      context.consume if scroll_wheel event
     end
 
     # Tells the surface how far the content moved, then leaves the drawing of

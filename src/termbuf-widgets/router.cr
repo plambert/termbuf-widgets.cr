@@ -247,10 +247,20 @@ module TermBuf::Widgets
     # Half a sequence typed at one widget means nothing at the next.
     private def reset_on_focus_change : Nil
       held = @focus.current
-      return if held.same? @last_focus
+      return if same_widget? held, @last_focus
 
       @matcher.reset
       @last_focus = held
+    end
+
+    # Whether two nilable widgets are the same object. `Reference#same?` takes
+    # a reference or nothing, not a union of the two, so the narrowing happens
+    # here rather than at every call site.
+    private def same_widget?(one : Widget?, other : Widget?) : Bool
+      return other.nil? if one.nil?
+      return false unless other
+
+      one.same? other
     end
   end
 end

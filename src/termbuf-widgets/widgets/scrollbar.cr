@@ -1,5 +1,5 @@
 require "../widget"
-require "./scrollable"
+require "./scrolls"
 
 module TermBuf::Widgets
   # Where a `Scrollable` has got to, and a handle for moving it.
@@ -25,9 +25,11 @@ module TermBuf::Widgets
       Horizontal
     end
 
-    # The panel this bar shows the position of, or `nil` for one attached to
-    # nothing, which draws an empty track.
-    property target : Scrollable?
+    # What this bar shows the position of, or `nil` for one attached to
+    # nothing, which draws an empty track. A `Scrollable` and a `VirtualList`
+    # are both `Scrolls`, and so is anything else that is a window over more
+    # than fits in it.
+    property target : Scrolls?
 
     # Which way the bar runs, or `nil` to take it from what the panel clips.
     layout_property orientation : Orientation? = nil
@@ -47,7 +49,7 @@ module TermBuf::Widgets
     # Where in the thumb it was picked up, or `nil` when nothing is dragging.
     @grab : Int32? = nil
 
-    def initialize(@target : Scrollable? = nil,
+    def initialize(@target : Scrolls? = nil,
                    orientation : Orientation? = nil,
                    style : Style? = nil)
       @orientation = orientation
@@ -153,7 +155,11 @@ module TermBuf::Widgets
 
       held = @target
       return unless held
-      return held.handle event, context if wheel? event
+
+      if wheel? event
+        context.consume if held.scroll_wheel event
+        return
+      end
 
       case event.action
       in .press?   then pressed held, at(event), context
@@ -173,7 +179,7 @@ module TermBuf::Widgets
       vertical? ? event.y - box.y : event.x - box.x
     end
 
-    private def pressed(held : Scrollable, position : Int32, context : Context) : Nil
+    private def pressed(held : Scrolls, position : Int32, context : Context) : Nil
       context.consume
       start = thumb_start
 
@@ -187,7 +193,7 @@ module TermBuf::Widgets
       end
     end
 
-    private def dragged(held : Scrollable, position : Int32, context : Context) : Nil
+    private def dragged(held : Scrolls, position : Int32, context : Context) : Nil
       grab = @grab
       return unless grab
 
@@ -210,18 +216,18 @@ module TermBuf::Widgets
     end
 
     # One window's worth, towards *direction*.
-    private def page(held : Scrollable, direction : Int32) : Nil
+    private def page(held : Scrolls, direction : Int32) : Nil
       _, room, _ = measures
       step = Math.max(room, 1) * direction
 
-      vertical? ? held.scroll_by(dy: step) : held.scroll_by(dx: step)
+      vertical? ? held.scroll_by(0, step) : held.scroll_by(step, 0)
     end
 
-    private def move(held : Scrollable, to : Int32) : Nil
+    private def move(held : Scrolls, to : Int32) : Nil
       if vertical?
-        held.scroll_by dy: to - held.scroll_y
+        held.scroll_by 0, to - held.scroll_y
       else
-        held.scroll_by dx: to - held.scroll_x
+        held.scroll_by to - held.scroll_x, 0
       end
     end
   end

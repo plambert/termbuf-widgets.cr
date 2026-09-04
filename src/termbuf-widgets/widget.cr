@@ -224,6 +224,19 @@ module TermBuf::Widgets
       !@floating.nil?
     end
 
+    # Whether this is the same widget as *other*.
+    #
+    # `Reference#same?` takes a reference or nothing, not a union of the two,
+    # and a widget is very often compared against one that may be missing: the
+    # answer from a hit test, the widget with the keyboard, the parent of a
+    # root. This is the overload that saves every one of those call sites from
+    # narrowing first.
+    def same?(other : Widget?) : Bool
+      return false unless other
+
+      super other
+    end
+
     # Whether *root* is this widget or an ancestor of it, which is how a
     # widget still in a tree is told from one taken out of it.
     def under?(root : Widget) : Bool
