@@ -5,19 +5,21 @@ module Fixtures
   # This is the whole pipeline a widget spec wants: the layout, the clipping
   # and the style merging a real frame does, with the terminal left out.
   def self.render(widget : TermBuf::Widgets::Widget, columns : Int32 = 30, rows : Int32 = 6,
-                  policy : TermBuf::Unicode::WidthPolicy = TermBuf::Unicode::WidthPolicy::DEFAULT) : Array(String)
-    text_of painted(widget, columns, rows, policy)
+                  policy : TermBuf::Unicode::WidthPolicy = TermBuf::Unicode::WidthPolicy::DEFAULT,
+                  images : TermBuf::ImageStore? = nil) : Array(String)
+    text_of painted(widget, columns, rows, policy, images)
   end
 
   # The same, answering the buffer itself, for a spec asking about styles
   # rather than about characters.
   def self.painted(widget : TermBuf::Widgets::Widget, columns : Int32 = 30, rows : Int32 = 6,
-                   policy : TermBuf::Unicode::WidthPolicy = TermBuf::Unicode::WidthPolicy::DEFAULT) : TermBuf::Buffer
+                   policy : TermBuf::Unicode::WidthPolicy = TermBuf::Unicode::WidthPolicy::DEFAULT,
+                   images : TermBuf::ImageStore? = nil) : TermBuf::Buffer
     buffer = TermBuf::Buffer.new columns, rows
     buffer.policy = policy
     tree = TermBuf::Widgets::Layout::Tree.new widget, TermBuf::Rect.full(columns, rows), policy
     tree.layout_if_needed
-    TermBuf::Widgets::Renderer.render tree, TermBuf::BufferSurface.new(buffer)
+    TermBuf::Widgets::Renderer.render tree, TermBuf::BufferSurface.new(buffer), images
 
     buffer
   end

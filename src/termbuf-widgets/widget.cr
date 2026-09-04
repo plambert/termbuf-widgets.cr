@@ -80,6 +80,21 @@ module TermBuf::Widgets
     # Cells held back inside the widget's own rectangle.
     layout_property padding : Layout::Padding = Layout::Padding.all(0)
 
+    # Cells held back around the outside of what the widget draws.
+    #
+    # Margin lives on the widget rather than being applied by its parent, and
+    # it is the outermost part of `#inset`: the layout reserves it the way it
+    # reserves a border and padding, so `#rect` is the whole claim and
+    # `#frame` is the box the widget is actually drawn in.
+    #
+    # That makes a size the size of the claim. `Layout::Sizing.fixed(10)` with
+    # a margin of one is ten cells across with eight of content, the same way
+    # ten cells with a border is eight of content. It is the rule the engine
+    # already followed for border and padding, extended outwards rather than a
+    # second rule beside it. Margins do not collapse: two widgets side by side
+    # with a margin of one each have two cells between them.
+    layout_property margin : Layout::Padding = Layout::Padding.all(0)
+
     # Cells between one child and the next, along `#direction`.
     layout_property gap : Int32 = 0
 
@@ -165,13 +180,22 @@ module TermBuf::Widgets
       @min_size[1]
     end
 
-    # Padding and border together: everything between the widget's own
+    # Margin, border and padding together: everything between the widget's own
     # rectangle and the box its children are laid out in.
     def inset : Layout::Padding
-      return @padding unless @border
+      spacing = @margin + @padding
+      return spacing unless @border
 
-      Layout::Padding.new @padding.top + 1, @padding.right + 1,
-        @padding.bottom + 1, @padding.left + 1
+      Layout::Padding.new spacing.top + 1, spacing.right + 1,
+        spacing.bottom + 1, spacing.left + 1
+    end
+
+    # The box the widget is drawn in, in buffer coordinates: its rectangle
+    # less its margin. What the ground fills and what the border goes around.
+    def frame : Rect
+      Rect.new @rect.x + @margin.left, @rect.y + @margin.top,
+        Math.max(0, @rect.width - @margin.horizontal),
+        Math.max(0, @rect.height - @margin.vertical)
     end
 
     # The box the children are laid out in, in buffer coordinates. Empty when
@@ -221,7 +245,9 @@ module TermBuf::Widgets
     # than inside its parent, so `Layout::Tree#hit` reaches it as a root of its
     # own.
     def at(x : Int32, y : Int32) : Widget?
-      return if @hidden || !@rect.contains?(x, y)
+      # A point on the margin is not on the widget: the margin is space it
+      # asked for so that nothing else would take it, not space it covers.
+      return if @hidden || !frame.contains?(x, y)
 
       @children.reverse_each do |child|
         next if child.floating
@@ -299,8 +325,19 @@ module TermBuf::Widgets
       0
     end
 
-    # Draws the widget through *view*, which is already cut to `#rect`.
+    # Draws the widget through *view*, which is already cut to `#content`.
     def draw(view : View) : Nil
+    end
+
+    # Puts whatever pictures this widget wants on the screen, at *frame* in
+    # buffer coordinates.
+    #
+    # Called once a frame, after the store has been emptied, so a widget states
+    # what it wants on screen now rather than tracking what it put there last
+    # time. Nothing is called at all without a store, and a store built for a
+    # terminal that cannot draw pictures sends no bytes, so a widget that wants
+    # one costs nothing where there is no way to show it.
+    def place_images(store : ImageStore, frame : Rect) : Nil
     end
 
     # Where the terminal's cursor belongs while this widget has focus, or

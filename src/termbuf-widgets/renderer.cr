@@ -25,9 +25,17 @@ module TermBuf::Widgets
     extend self
 
     # Draws every root of *tree* onto *screen*, lowest first.
-    def render(tree : Layout::Tree, screen : Drawing) : Nil
+    #
+    # *images* is where a widget's pictures go. The store is emptied first and
+    # filled again as the walk reaches each widget, so what is on screen is
+    # what this frame asked for and nothing a previous one left. Without a
+    # store no widget is asked, which is what a terminal that draws no
+    # pictures gets.
+    def render(tree : Layout::Tree, screen : Drawing, images : ImageStore? = nil) : Nil
+      images.try &.clear
+
       tree.roots_in_z_order.each do |root|
-        paint root, screen, tree.screen, Style::DEFAULT, true
+        paint root, screen, tree.screen, Style::DEFAULT, true, images
       end
     end
 
@@ -37,7 +45,7 @@ module TermBuf::Widgets
     # coordinates, and *inherited* is the style this widget's own is merged
     # onto.
     private def paint(widget : Widget, screen : Drawing, clip : Rect,
-                      inherited : Style, root : Bool) : Nil
+                      inherited : Style, root : Bool, images : ImageStore?) : Nil
       return if widget.hidden?
 
       area = widget.rect.intersect clip
@@ -46,17 +54,30 @@ module TermBuf::Widgets
       style = widget.style
       effective = style ? inherited.merge(style) : inherited
       view = scissor(screen, clip).view local(widget.rect, clip), effective
+      box = framed widget
 
-      view.fill view.bounds if root || style
-      widget.border.try &.draw(view, view.bounds)
+      view.fill box if root || style
+      widget.border.try &.draw(view, box)
       widget.draw view.view(inside(widget), effective)
+      images.try { |store| widget.place_images store, widget.frame }
 
-      inside = clip_for widget, clip
+      inner = clip_for widget, clip
       widget.children.each do |child|
         next if child.floating
 
-        paint child, screen, inside, effective, false
+        paint child, screen, inner, effective, false, images
       end
+    end
+
+    # The box the widget is drawn in, in its own view's coordinates: its
+    # rectangle less its margin. The ground is filled and the border drawn
+    # around this rather than around the whole rectangle, because a margin is
+    # space the widget asked nobody else to use, not space it covers.
+    private def framed(widget : Widget) : Rect
+      margin = widget.margin
+      Rect.new margin.left, margin.top,
+        Math.max(0, widget.rect.width - margin.horizontal),
+        Math.max(0, widget.rect.height - margin.vertical)
     end
 
     # A widget's content box in its own view's coordinates: its rectangle less

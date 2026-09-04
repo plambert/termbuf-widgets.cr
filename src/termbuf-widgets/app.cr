@@ -48,6 +48,10 @@ module TermBuf::Widgets
     # own quit key or its resize bookkeeping from.
     property on_event : Proc(Event, Nil)? = nil
 
+    # Where a widget's pictures go, or `nil` for an application that has none.
+    # `TermBuf::Terminal#images` is one.
+    property images : ImageStore? = nil
+
     def initialize(@screen : Drawing, root : Widget, size : Rect,
                    @events : Channel(Event) = Channel(Event).new(64),
                    policy : Unicode::WidthPolicy = Unicode::WidthPolicy::DEFAULT,
@@ -89,7 +93,7 @@ module TermBuf::Widgets
       @tree.layout_if_needed
       @focus.rebuild if stale
 
-      Renderer.render @tree, @screen
+      Renderer.render @tree, @screen, @images
       @cursor = cursor_for_focus
     end
 
