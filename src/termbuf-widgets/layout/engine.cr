@@ -78,55 +78,105 @@ module TermBuf::Widgets::Layout
     # the same expression one slot further along, so the rounding error never
     # accumulates and the boundaries always reach *total* exactly.
     #
-    # A slot that lands outside `[min, max]` is fixed at the bound it broke,
-    # taken out of *total* and out of the weight, and the rest are divided
-    # again. Each round pins at least one slot, so this ends in at most
-    # `slots.size` rounds.
+    # Bounds are settled in two rounds of that, and the order matters. First
+    # the ceilings: a slot that would take more than it accepts is held there
+    # and gives the rest back, which is what lets the slot beside it take what
+    # was declined. Then the floors, against what the ceilings left. Doing it
+    # the other way round pins a floor with cells a ceiling was about to
+    # release, and the release then has nowhere to go.
     #
-    # *total_weight* is the denominator to divide against, which is the sum of
-    # the weights for grow and shrink and a flat 100 for percent, where the
-    # shares are of the whole box whether or not they add up to it.
-    def apportion(slots : Array(Slot), total : Int32, total_weight : Int32? = nil) : Array(Int32)
+    # Each round pins at least one slot, so each ends in at most `slots.size`
+    # passes. When the floors alone come to *total* or more, that is the answer
+    # and whatever holds these slots overflows.
+    def apportion(slots : Array(Slot), total : Int32) : Array(Int32)
+      return Array(Int32).new(slots.size, 0) if slots.empty?
+      return slots.map(&.min) if slots.sum(&.min) >= total
+
       results = Array(Int32).new slots.size, 0
-      return results if slots.empty?
+      free = (0...slots.size).to_a
+      capped = [] of Int32
+      after_ceilings = settle(slots, results, free, capped, total) { |slot, value| value > slot.ceiling }
+      settle(slots, results, free, [] of Int32, after_ceilings) { |slot, value| value < slot.min }
 
-      weight = (total_weight || slots.sum(&.weight)).to_i64
-      budget = total.to_i64
-      open = (0...slots.size).to_a
-
-      slots.size.times do
-        break if open.empty?
-
-        share open, slots, results, budget, weight
-        clamped = false
-
-        open.reject! do |index|
-          slot = slots[index]
-          value = results[index]
-          bound = if value < slot.min
-                    slot.min
-                  elsif value > slot.ceiling
-                    slot.ceiling
-                  end
-          next false unless bound
-
-          results[index] = bound
-          budget -= bound
-          weight -= slot.weight
-          clamped = true
-        end
-
-        break unless clamped
-      end
-
+      give_back slots, results, capped, total
       results
     end
 
-    # Writes each open slot's share of *budget* into *results*.
-    private def share(open : Array(Int32), slots : Array(Slot), results : Array(Int32),
-                      budget : Int64, weight : Int64) : Nil
+    # Each slot's own share of *total*, *whole* being what the weights are
+    # shares of rather than a sum to divide up.
+    #
+    # This is what a percent is: 30 of 100 of the box, whether or not its
+    # siblings claim the other 70, and a share held back by a bound of its own
+    # moves nothing else. Boundaries again, so the shares of a whole hundred
+    # come to exactly *total*.
+    def share_of(slots : Array(Slot), total : Int32, whole : Int32) : Array(Int32)
+      return Array(Int32).new(slots.size, 0) if whole <= 0
+
+      cumulative = 0_i64
+      previous = 0_i64
+      half = (whole // 2).to_i64
+
+      slots.map do |slot|
+        cumulative += slot.weight
+        boundary = (cumulative * total + half) // whole
+        value = (boundary - previous).to_i32
+        previous = boundary
+        value.clamp slot.min, slot.ceiling
+      end
+    end
+
+    # Divides *budget* among the *free* slots over and over, each pass pinning
+    # every slot the block objects to at the bound it broke and taking it out
+    # of the pool. Answers what is left of *budget*.
+    private def settle(slots : Array(Slot), results : Array(Int32),
+                       free : Array(Int32), pinned : Array(Int32), budget : Int32,
+                       & : Slot, Int32 -> Bool) : Int32
+      slots.size.times do
+        break if free.empty?
+
+        share free, slots, results, budget
+        caught = free.select { |index| yield slots[index], results[index] }
+        break if caught.empty?
+
+        caught.each do |index|
+          bound = results[index].clamp slots[index].min, slots[index].ceiling
+          results[index] = bound
+          budget -= bound
+          free.delete index
+        end
+        pinned.concat caught
+      end
+
+      budget
+    end
+
+    # Hands back what the ceilings are holding when the floors turned out to
+    # need it.
+    #
+    # A slot pinned at its ceiling was judged against a share worked out before
+    # anyone's floor had been paid for. When those floors then take the box
+    # past *total*, the cells to give up are the ones sitting above a floor of
+    # their own, and the ceiling pins are exactly those.
+    private def give_back(slots : Array(Slot), results : Array(Int32),
+                          capped : Array(Int32), total : Int32) : Nil
+      return if capped.empty?
+
+      excess = results.sum - total
+      return if excess <= 0
+
+      held = capped.sum { |index| results[index] }
+      group = capped.map { |index| Slot.new results[index], slots[index].min, results[index] }
+      shares = apportion group, Math.max(0, held - excess)
+
+      capped.each_with_index { |index, position| results[index] = shares[position] }
+    end
+
+    # Writes each free slot's share of *budget* into *results*.
+    private def share(free : Array(Int32), slots : Array(Slot),
+                      results : Array(Int32), budget : Int32) : Nil
+      weight = free.sum { |index| slots[index].weight }.to_i64
       if weight <= 0
-        open.each { |index| results[index] = 0 }
+        free.each { |index| results[index] = 0 }
         return
       end
 
@@ -134,7 +184,7 @@ module TermBuf::Widgets::Layout
       previous = 0_i64
       half = weight // 2
 
-      open.each do |index|
+      free.each do |index|
         cumulative += slots[index].weight
         boundary = (cumulative * budget + half) // weight
         results[index] = (boundary - previous).to_i32
@@ -223,18 +273,50 @@ module TermBuf::Widgets::Layout
 
       apply_percent children, base, axis
 
-      remaining = base - children.sum { |child| size_of child, axis }
-      return if remaining.zero?
+      # A grower has been given nothing yet, but it can never come out below
+      # its own minimum, so that much of the box is already spoken for. Count
+      # it, or a row whose growers insist on more than is left over never
+      # notices that its fitting children could have given the room up.
+      remaining = base - children.sum { |child| committed_size child, axis }
 
       if remaining < 0
+        pin_growers children, axis
+
         # A widget that clips this axis is a window onto its content, so the
         # content keeps the size it asked for and the edges do the cutting.
         return if clips? widget, axis
 
-        shrink children.select { |child| flexible? child, axis }, remaining, axis
+        fitting = children.select { |child| sizing_of(child, axis).fit? }
+        shrink fitting, base - total_apart_from(children, fitting, axis), axis
       else
-        grow children.select { |child| sizing_of(child, axis).grow? }, remaining, axis
+        growers = children.select { |child| sizing_of(child, axis).grow? }
+        grow growers, base - total_apart_from(children, growers, axis), axis
       end
+    end
+
+    # What a child has already laid claim to: a grower's minimum, since that
+    # is the least it can end up at, and everything else's current size.
+    private def committed_size(widget : Widget, axis : Axis) : Int32
+      return min_of widget, axis if sizing_of(widget, axis).grow?
+
+      size_of widget, axis
+    end
+
+    # Puts every grower at its own minimum, which is where it stays when the
+    # box has nothing left over to divide.
+    private def pin_growers(children : Array(Widget), axis : Axis) : Nil
+      children.each do |child|
+        next unless sizing_of(child, axis).grow?
+
+        set_size child, axis, min_of(child, axis)
+      end
+    end
+
+    # What the children outside *group* take up, which is what *group* has to
+    # share the rest of.
+    private def total_apart_from(children : Array(Widget), group : Array(Widget),
+                                 axis : Axis) : Int32
+      children.sum { |child| group.any?(&.same?(child)) ? 0 : size_of(child, axis) }
     end
 
     # Across the stacking axis, where every child gets the whole content box
@@ -267,11 +349,11 @@ module TermBuf::Widgets::Layout
         Slot.new sizing.weight, min_of(child, axis), sizing.max
       end
 
-      assign shares, apportion(slots, base, 100), axis
+      assign shares, share_of(slots, base, 100), axis
     end
 
-    # Divides *remaining* among the growers.
-    private def grow(children : Array(Widget), remaining : Int32, axis : Axis) : Nil
+    # Divides *target* cells among the growers.
+    private def grow(children : Array(Widget), target : Int32, axis : Axis) : Nil
       return if children.empty?
 
       slots = children.map do |child|
@@ -279,21 +361,21 @@ module TermBuf::Widgets::Layout
         Slot.new sizing.weight, min_of(child, axis), sizing.max
       end
 
-      assign children, apportion(slots, remaining), axis
+      assign children, apportion(slots, Math.max(0, target)), axis
     end
 
-    # Takes *remaining*, which is negative, out of the children that can give
-    # it, in proportion to what each of them currently has.
-    private def shrink(children : Array(Widget), remaining : Int32, axis : Axis) : Nil
+    # Fits *children* into *target* cells between them, taking the shortfall in
+    # proportion to what each of them currently has and stopping at each
+    # child's own minimum.
+    private def shrink(children : Array(Widget), target : Int32, axis : Axis) : Nil
       return if children.empty?
 
       sizes = children.map { |child| size_of child, axis }
-      total = sizes.sum
       slots = children.map_with_index do |child, index|
         Slot.new sizes[index], min_of(child, axis), sizes[index]
       end
 
-      assign children, apportion(slots, Math.max(0, total + remaining), total), axis
+      assign children, apportion(slots, Math.max(0, target)), axis
     end
 
     private def assign(children : Array(Widget), sizes : Array(Int32), axis : Axis) : Nil
@@ -400,11 +482,6 @@ module TermBuf::Widgets::Layout
       in .row?    then axis.x?
       in .column? then axis.y?
       end
-    end
-
-    private def flexible?(widget : Widget, axis : Axis) : Bool
-      sizing = sizing_of widget, axis
-      sizing.fit? || sizing.grow?
     end
 
     private def clips?(widget : Widget, axis : Axis) : Bool

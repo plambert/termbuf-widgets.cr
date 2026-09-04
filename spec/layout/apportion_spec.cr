@@ -38,16 +38,54 @@ Spectator.describe Layout::Engine do
       end
     end
 
-    context "against a denominator of its own" do
-      it "gives each slot its percent of the total" do
-        result = Layout::Engine.apportion slots([25, 25, 25, 25]), 10, 100
-        expect(result).to eq [3, 2, 3, 2]
+    context "when a ceiling is holding what a floor needs" do
+      it "hands it back rather than overflowing" do
+        result = Layout::Engine.apportion(
+          slots([3, 2, 1], mins: [16, 15, 17], maxes: [18, Int32::MAX, Int32::MAX]), 49)
+        expect(result).to eq [17, 15, 17]
+        expect(result.sum).to eq 49
       end
 
-      it "leaves the rest alone when the shares do not add up to the whole" do
-        result = Layout::Engine.apportion slots([25, 25]), 10, 100
-        expect(result).to eq [3, 2]
+      it "leaves nothing unclaimed when a slot declines its share" do
+        result = Layout::Engine.apportion(
+          slots([1, 3], mins: [5, 0], maxes: [Int32::MAX, 2]), 10)
+        expect(result).to eq [8, 2]
+        expect(result.sum).to eq 10
       end
+    end
+  end
+
+  describe ".share_of" do
+    it "gives each slot its percent of the total" do
+      expect(Layout::Engine.share_of(slots([25, 25, 25, 25]), 10, 100)).to eq [3, 2, 3, 2]
+    end
+
+    it "splits an odd total at the rounded boundary" do
+      expect(Layout::Engine.share_of(slots([50, 50]), 7, 100)).to eq [4, 3]
+    end
+
+    it "reaches the total exactly when the shares come to the whole" do
+      (0..64).each do |total|
+        expect(Layout::Engine.share_of(slots([33, 33, 34]), total, 100).sum).to eq total
+      end
+    end
+
+    it "leaves the rest alone when the shares do not add up to the whole" do
+      expect(Layout::Engine.share_of(slots([25, 25]), 10, 100)).to eq [3, 2]
+    end
+
+    it "holds a share at a bound of its own without moving any other" do
+      bounded = Layout::Engine.share_of slots([50, 50], maxes: [2, Int32::MAX]), 10, 100
+      expect(bounded).to eq [2, 5]
+    end
+
+    it "raises a share to its floor without moving any other" do
+      bounded = Layout::Engine.share_of slots([10, 90], mins: [4, 0]), 10, 100
+      expect(bounded).to eq [4, 9]
+    end
+
+    it "gives every slot nothing when the whole is zero" do
+      expect(Layout::Engine.share_of(slots([50, 50]), 10, 0)).to eq [0, 0]
     end
 
     context "when a slot lands below its minimum" do
