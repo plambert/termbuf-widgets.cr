@@ -17,3 +17,6 @@
 /.spectator-failures
 /tmp/
 /.rumdl_cache/
+
+# Compiled examples: crystal build drops the binary beside its source.
+/examples/field
