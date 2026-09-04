@@ -20,3 +20,4 @@
 
 # Compiled examples: crystal build drops the binary beside its source.
 /examples/field
+/examples/widgets
