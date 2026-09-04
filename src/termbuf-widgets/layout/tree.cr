@@ -170,6 +170,7 @@ module TermBuf::Widgets::Layout
 
       before = {} of Widget => Rect
       @root.each_in_tree { |widget| before[widget] = widget.rect }
+      collect_floats
       Engine.run self
       verify before
     end
