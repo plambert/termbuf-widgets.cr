@@ -28,8 +28,29 @@ module Fixtures
       box = Box.new
       shape box
       box.direction = pick Layout::Direction::Row, Layout::Direction::Column
-      @random.rand(1..fan_out).times { box.add child(level, depth, fan_out) }
+      @random.rand(1..fan_out).times do
+        node = box.add child(level, depth, fan_out)
+        lift node, box if @random.rand(8).zero?
+      end
       box
+    end
+
+    # Takes *widget* out of its parent's flow, anchored either to the screen or
+    # to the parent it was lifted out of.
+    private def lift(widget : Widget, parent : Widget) : Nil
+      target = @random.rand(2).zero? ? nil : parent
+      anchor = Layout::Anchor.new target, attach_point, attach_point,
+        @random.rand(-3..3), @random.rand(-3..3)
+
+      widget.floating = Layout::Floating.new anchor,
+        z: @random.rand(0..4),
+        capture: !@random.rand(4).zero?,
+        overflow: pick(Layout::Overflow::Flip, Layout::Overflow::Clamp)
+    end
+
+    private def attach_point : Layout::AttachPoint
+      points = Layout::AttachPoint.values
+      points[@random.rand(points.size)]
     end
 
     private def child(level : Int32, depth : Int32, fan_out : Int32) : Widget

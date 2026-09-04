@@ -17,6 +17,10 @@ Spectator.describe "layout invariants" do
           fail "seed #{seed}, tree #{round}, screen #{screen}: #{failure}"
         end
 
+        if failure = Fixtures::Invariants.check_hits(tree, random)
+          fail "seed #{seed}, tree #{round}, screen #{screen}: #{failure}"
+        end
+
         settled = Fixtures::Invariants.rects tree
 
         tree.layout

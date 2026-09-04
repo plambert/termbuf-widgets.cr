@@ -23,10 +23,79 @@ module Fixtures
         failure = check_widget widget
       end
 
+      failure ||= check_floats tree
       return failure if failure
       return if overflowed
 
       check_screen tree
+    end
+
+    # Every float sits inside the screen, unless it is larger than the screen,
+    # in which case it sits at the edge and the view cuts it. And the painting
+    # order is the root, then the floats by z, lowest first.
+    def check_floats(tree : Layout::Tree) : String?
+      screen = tree.screen
+
+      tree.floats.each do |float|
+        if failure = check_placed(float, screen, Axis::X) || check_placed(float, screen, Axis::Y)
+          return failure
+        end
+      end
+
+      check_z_order tree
+    end
+
+    # Whatever `Layout::Tree#hit` answers for a point covers that point, is
+    # visible, and is not a float that declined to capture.
+    def check_hits(tree : Layout::Tree, random : Random) : String?
+      screen = tree.screen
+      return if screen.empty?
+
+      12.times do
+        x = random.rand screen.x..(screen.x + screen.width - 1)
+        y = random.rand screen.y..(screen.y + screen.height - 1)
+        found = tree.hit x, y
+        next unless found
+
+        return "#{found.class} at #{found.rect} was hit at #{x},#{y}" unless found.rect.contains? x, y
+        return "hidden #{found.class} was hit at #{x},#{y}" if found.hidden?
+      end
+
+      nil
+    end
+
+    private def check_placed(float : Widget, screen : TermBuf::Rect, axis : Axis) : String?
+      start = origin screen, axis
+      at = origin float.rect, axis
+      size = extent float.rect, axis
+      room = extent screen, axis
+
+      return "#{float.class} at #{float.rect} starts before the screen #{screen} on #{axis}" if at < start
+      return if at + size <= start + room
+      return if size > room && at == start
+
+      "#{float.class} at #{float.rect} runs past the screen #{screen} on #{axis} with room to slide back"
+    end
+
+    private def check_z_order(tree : Layout::Tree) : String?
+      roots = tree.roots_in_z_order
+      return "the painting order does not start with the root" unless roots.first?.try &.same?(tree.root)
+
+      if roots.size != tree.floats.size + 1
+        return "the painting order holds #{roots.size} roots for #{tree.floats.size} floats"
+      end
+
+      previous = nil.as(Int32?)
+      roots.each_with_index do |candidate, index|
+        next if index.zero?
+
+        depth = candidate.floating.try(&.z) || 0
+        return "the painting order puts z #{depth} after z #{previous}" if previous && depth < previous
+
+        previous = depth
+      end
+
+      nil
     end
 
     # Yields every visible widget, parents first, skipping a hidden subtree
@@ -179,12 +248,14 @@ module Fixtures
       nil
     end
 
-    # Nothing landed off the screen, in a tree where nothing overflowed.
+    # Nothing in the flow landed off the screen, in a tree where nothing
+    # overflowed. Floats are placed against the screen rather than laid out in
+    # it, and `#check_floats` is what holds them to it.
     private def check_screen(tree : Layout::Tree) : String?
       screen = tree.screen
       failure = nil
 
-      walk tree.root do |widget|
+      walk_flow tree.root do |widget|
         next if failure
         next if screen.contains? widget.rect
 
@@ -192,6 +263,14 @@ module Fixtures
       end
 
       failure
+    end
+
+    # Yields every visible widget laid out in the flow, stopping at a float.
+    private def walk_flow(widget : Widget, &block : Widget ->) : Nil
+      return if widget.hidden?
+
+      block.call widget
+      widget.visible_children.each { |child| walk_flow child, &block }
     end
 
     private def insisted(widget : Widget, axis : Axis) : Int32
