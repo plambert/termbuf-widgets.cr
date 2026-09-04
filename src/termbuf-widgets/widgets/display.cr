@@ -18,3 +18,4 @@
 
 require "./display/status_bar"
 require "./display/progress_bar"
+require "./display/single_value"
