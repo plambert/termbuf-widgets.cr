@@ -17,3 +17,4 @@
 # phase — is advanced by whatever is driving the frames.
 
 require "./display/status_bar"
+require "./display/progress_bar"
