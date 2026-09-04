@@ -13,3 +13,10 @@ module TermBuf::Widgets
   VERSION = {{ `#{command.id}`.strip.stringify }}
   {% end %}
 end
+
+require "./termbuf-widgets/layout/errors"
+require "./termbuf-widgets/layout/padding"
+require "./termbuf-widgets/layout/sizing"
+require "./termbuf-widgets/widget"
+require "./termbuf-widgets/layout/tree"
+require "./termbuf-widgets/layout/engine"
