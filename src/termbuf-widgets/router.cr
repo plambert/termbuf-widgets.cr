@@ -56,6 +56,17 @@ module TermBuf::Widgets
       @consumed = true
     end
 
+    # Sends every positioned event to *widget* until it lets go, which is what
+    # a drag needs: the pointer leaves the thing being dragged almost at once.
+    def capture(widget : Widget) : Nil
+      @router.captured = widget
+    end
+
+    # Ends a capture.
+    def release : Nil
+      @router.captured = nil
+    end
+
     # Where the keyboard is.
     def focus : Focus::Stack
       @router.focus
@@ -96,6 +107,14 @@ module TermBuf::Widgets
 
     # Messages emitted since the last drain, in the order they were sent.
     getter pending = [] of Post
+
+    # The widget every positioned event goes to while it is dragging,
+    # wherever the pointer has got to, or `nil` when nothing is.
+    #
+    # A drag without this lasts until the pointer leaves the thing being
+    # dragged, which for a one-cell scrollbar thumb is immediately. Set it
+    # through `Context#capture`.
+    property captured : Widget? = nil
 
     @last_focus : Widget? = nil
 
@@ -181,9 +200,22 @@ module TermBuf::Widgets
     # Where the chain starts.
     private def start_of(event : Event, from : Widget?) : Widget?
       return from.try(&.parent) if event.is_a? Message
-      return @tree.hit event.x, event.y if event.is_a? Positioned
+      return positioned_start event if event.is_a? Positioned
 
       @focus.current
+    end
+
+    # Whatever is dragging, or whatever is under the pointer. A capture held by
+    # a widget that has since left the tree is dropped rather than followed.
+    private def positioned_start(event : Positioned) : Widget?
+      held = @captured
+      if held
+        return held if @tree.holds?(held) && !held.hidden?
+
+        @captured = nil
+      end
+
+      @tree.hit event.x, event.y
     end
 
     # Whether a binding claimed the key. Also true while the matcher is holding
