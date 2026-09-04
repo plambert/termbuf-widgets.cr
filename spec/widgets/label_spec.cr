@@ -143,39 +143,33 @@ Spectator.describe TermBuf::Widgets::Label do
 
   describe "#draw" do
     it "writes each wrapped line on its own row" do
-      label = Label.new "aa bb cc"
-      Layout::Tree.new(label, Rect.full(5, 3)).layout
-
-      expect(Fixtures.painted(label, 5, 3)).to eq ["aa bb", "cc", ""]
+      expect(Fixtures.render(Label.new("aa bb cc"), 5, 3)).to eq ["aa bb", "cc", ""]
     end
 
     it "puts the leftover before the text when it is aligned right" do
       label = Label.new "ab", align: TermBuf::Unicode::Align::Right
-      Layout::Tree.new(label, Rect.full(6, 1)).layout
-
-      expect(Fixtures.painted(label, 6, 1)).to eq ["    ab"]
+      expect(Fixtures.render(label, 6, 1)).to eq ["    ab"]
     end
 
     it "splits the leftover when it is centred" do
       label = Label.new "ab", align: TermBuf::Unicode::Align::Center
-      Layout::Tree.new(label, Rect.full(6, 1)).layout
-
-      expect(Fixtures.painted(label, 6, 1)).to eq ["  ab"]
+      expect(Fixtures.render(label, 6, 1)).to eq ["  ab"]
     end
 
     it "marks a line it had to cut short" do
       label = Label.new "abcdefgh", wrap: Wrap::None, ellipsis: "…"
-      label.width = Sizing.fixed 5
-      Layout::Tree.new(label, Rect.full(5, 1)).layout
-
-      expect(Fixtures.painted(label, 5, 1)).to eq ["abcd…"]
+      expect(Fixtures.render(label, 5, 1)).to eq ["abcd…"]
     end
 
     it "draws nothing at all for an empty text" do
-      label = Label.new ""
-      Layout::Tree.new(label, Rect.full(5, 2)).layout
+      expect(Fixtures.render(Label.new(""), 5, 2)).to eq ["", ""]
+    end
 
-      expect(Fixtures.painted(label, 5, 2)).to eq ["", ""]
+    it "measures the terminal's own clusters, not the standard's" do
+      wide = TermBuf::Unicode::WidthPolicy::DEFAULT.copy_with ambiguous: 2
+      label = Label.new "①① x"
+
+      expect(Fixtures.render(label, 5, 2, wide)).to eq ["①①", "x"]
     end
   end
 end

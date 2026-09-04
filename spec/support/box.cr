@@ -34,31 +34,31 @@ module Fixtures
       @lines
     end
 
+    # Where this box wants the cursor, relative to its own top left.
+    property cursor : {Int32, Int32}? = nil
+
+    # Whether focus can land here.
+    property? focusable : Bool = false
+
+    # Written into the box's own rectangle when it draws, so a renderer spec
+    # can see where it landed and what it was allowed to cover.
+    property mark : String? = nil
+
+    def cursor_position : {Int32, Int32}?
+      @cursor
+    end
+
+    def draw(view : TermBuf::View) : Nil
+      mark = @mark
+      return unless mark
+
+      view.height.times { |row| view.write 0, row, mark }
+    end
+
     # Changes the gap behind the setter's back, which is what a widget written
     # without `layout_property` would do by accident.
     def poke_gap(gap : Int32) : Nil
       @gap = gap
     end
-  end
-end
-
-module Fixtures
-  # What a row of *buffer* would paint, with trailing blanks trimmed.
-  def self.row_text(buffer : TermBuf::Buffer, row : Int32) : String
-    text = String.build do |io|
-      buffer.width.times { |column| io << buffer.back[column, row].text(buffer.clusters) }
-    end
-
-    text.rstrip ' '
-  end
-
-  # Draws *widget* into a fresh buffer *width* by *height* and gives back every
-  # row of it.
-  def self.painted(widget : TermBuf::Widgets::Widget, width : Int32, height : Int32) : Array(String)
-    buffer = TermBuf::Buffer.new width, height
-    surface = TermBuf::BufferSurface.new buffer
-    widget.draw surface.view(widget.rect)
-
-    Array.new(height) { |row| row_text buffer, row }
   end
 end

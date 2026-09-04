@@ -3,6 +3,8 @@ require "../src/termbuf-widgets"
 require "./support/box"
 require "./support/generator"
 require "./support/invariants"
+require "./support/test_app"
+require "./support/harness"
 
 alias Layout = TermBuf::Widgets::Layout
 alias Sizing = TermBuf::Widgets::Layout::Sizing
@@ -28,3 +30,7 @@ def conflict(& : ->) : Keymap::Conflict
 rescue error : Keymap::Conflict
   error
 end
+
+# Every spec that lays a tree out is also a check that nothing changed its
+# geometry without saying so. See `Layout::Tree.verify_invalidation`.
+TermBuf::Widgets::Layout::Tree.verify_invalidation = true
