@@ -1,0 +1,26 @@
+name: termbuf-widgets
+version: 0.1.0
+
+authors:
+  - Paul M. Lambert <plambert@plambert.net>
+
+crystal: '>= 1.21'
+
+license: MIT
+
+description: |
+  Widgets for TermBuf: a retained-mode layout engine that sizes and places a
+  tree of widgets in terminal cells, and the widgets that draw into the space
+  it gives them.
+
+dependencies:
+  termbuf:
+    github: plambert/termbuf.cr
+    branch: main
+
+development_dependencies:
+  spectator:
+    gitlab: arctic-fox/spectator
+    version: "~> 0.11"
+  guard:
+    github: plambert/guard.cr

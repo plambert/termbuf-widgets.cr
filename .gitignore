@@ -1,0 +1,19 @@
+/docs/
+/lib/
+/bin/
+/.shards/
+*.dwarf
+
+# Libraries don't need dependency lock
+# Dependencies will be locked in applications that use them
+/shard.lock
+
+# Local development points termbuf at a working copy; the committed
+# shard.yml always names the published repository.
+/shard.override.yml
+
+!/CLAUDE.md
+/scratch/
+/.spectator-failures
+/tmp/
+/.rumdl_cache/
