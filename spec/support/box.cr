@@ -55,10 +55,38 @@ module Fixtures
       view.height.times { |row| view.write 0, row, mark }
     end
 
+    # Everything `#handle` was given, in order.
+    getter seen = [] of TermBuf::Event
+
+    # What the box does with an event, beyond writing it down.
+    property on_handle : Proc(TermBuf::Event, TermBuf::Widgets::Context, Nil)? = nil
+
+    def handle(event : TermBuf::Event, context : TermBuf::Widgets::Context) : Nil
+      @seen << event
+      @on_handle.try &.call(event, context)
+    end
+
     # Changes the gap behind the setter's back, which is what a widget written
     # without `layout_property` would do by accident.
     def poke_gap(gap : Int32) : Nil
       @gap = gap
+    end
+  end
+end
+
+module Fixtures
+  # A mouse-like event, until `TermBuf` has one of its own. Routed by position
+  # because it includes `TermBuf::Widgets::Positioned`.
+  record Click, x : Int32, y : Int32 do
+    include TermBuf::Event
+    include TermBuf::Widgets::Positioned
+  end
+
+  # Something a widget says to whatever contains it.
+  struct Said < TermBuf::Widgets::Message
+    getter what : String
+
+    def initialize(@what : String)
     end
   end
 end
