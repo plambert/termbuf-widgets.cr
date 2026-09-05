@@ -9,6 +9,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- The overlay group of widgets, under `src/termbuf-widgets/widgets/overlay/`: `Dialog`, `Popover`,
+  `DropdownMenu`, `Drawer`, `Toast` with the `Toasts` that owns them, and `HelpOverlay`. Each is a
+  float put up with `#open` and taken down with `#close`; a modal one pushes a focus scope with
+  itself as the root, and every one of them carries a zero-sized `Overlay::Catcher` that answers
+  the points it did not, so a click cannot reach what is behind it.
+- `Overlay::Backdrop`, a screen-sized float that dims what is under an overlay through a
+  `TermBuf::Blend`. It paints over what is behind it rather than tinting it, because a drawing
+  surface can be written to and not read.
+- `Widget#wash`, a `TermBuf::Blend` the renderer hands to the view a widget and everything under it
+  draws through, so it settles the ground the renderer fills as well as anything drawn on it.
+- `App#after(span, &block)` and `App#cancel(nonce)`, with the `App#after=` and `App#cancel=` procs
+  an application wires to `TermBuf::Terminal#after` and `#cancel`. A `TermBuf::Events::Timer` for a
+  nonce the application armed runs its block and goes no further; one nobody armed is delivered
+  into the tree like any other event. Without the procs nothing is armed.
+- `App#keymap=`, which puts a keymap under the application and its base focus scope at once, so
+  `app.keymap = app.keymap.merge other` adds a binding without losing the ones that were there.
+- `examples/widgets.cr` has a fourth page, chosen with `4`: a dialog, a menu, a drawer and a stack
+  of toasts, each on a button.
 - The display group of widgets, under `src/termbuf-widgets/widgets/display/`: `StatusBar`,
   `ProgressBar`, `SingleValue`, `FormattedNumber`, `BytesDisplay` and `Rating`. Each is a leaf that
   fits its own content and draws into the box the layout gave it; none owns a timer, so a progress

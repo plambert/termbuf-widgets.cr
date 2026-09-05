@@ -201,4 +201,91 @@ Spectator.describe TermBuf::Widgets::App do
       expect(app.tree.dirty?).to be_false
     end
   end
+  describe "timers" do
+    # An application whose clock hands out nonces in order, and what it armed.
+    def clocked : {Fixtures::TestApp, Array(Time::Span), Array(UInt64)}
+      armed = [] of Time::Span
+      cancelled = [] of UInt64
+      app = Fixtures::TestApp.new Label.new("hi"), 6, 2
+      app.after = ->(span : Time::Span) { armed << span; armed.size.to_u64 }
+      app.cancel = ->(nonce : UInt64) { cancelled << nonce; nil }
+
+      {app, armed, cancelled}
+    end
+
+    it "arms nothing at all without a clock" do
+      app = Fixtures::TestApp.new Label.new("hi"), 6, 2
+      fired = false
+
+      expect(app.after(1.second) { fired = true; nil }).to be_nil
+      expect(fired).to be_false
+    end
+
+    it "arms one and runs it when the tick arrives" do
+      app, armed, _cancelled = clocked
+      fired = 0
+      nonce = app.after(2.seconds) { fired += 1; nil }
+
+      expect(armed).to eq [2.seconds]
+      expect(nonce).to eq 1_u64
+
+      app.events.send TermBuf::Events::Timer.new(1_u64)
+      app.pump
+
+      expect(fired).to eq 1
+    end
+
+    it "runs it once and no more" do
+      app, _armed, _cancelled = clocked
+      fired = 0
+      app.after(2.seconds) { fired += 1; nil }
+
+      2.times do
+        app.events.send TermBuf::Events::Timer.new(1_u64)
+        app.pump
+      end
+
+      expect(fired).to eq 1
+    end
+
+    it "withdraws one, and tells the clock" do
+      app, _armed, cancelled = clocked
+      fired = false
+      app.after(2.seconds) { fired = true; nil }
+      app.cancel 1_u64
+
+      expect(cancelled).to eq [1_u64]
+
+      app.events.send TermBuf::Events::Timer.new(1_u64)
+      app.pump
+
+      expect(fired).to be_false
+    end
+
+    it "leaves a tick nobody armed to the application" do
+      app, _armed, _cancelled = clocked
+      seen = [] of TermBuf::Event
+      app.on_event = ->(event : TermBuf::Event) { seen << event; nil }
+
+      app.events.send TermBuf::Events::Timer.new(9_u64)
+      app.pump
+
+      expect(seen.map &.class).to eq [TermBuf::Events::Timer]
+    end
+  end
+
+  describe "#keymap=" do
+    it "puts the new map under the application and its base scope" do
+      app = Fixtures::TestApp.new Label.new("hi"), 6, 2
+      extra = TermBuf::Widgets::Bindings.build do |map|
+        map.bind Key.parse("F5"), "refresh",
+          ->(_context : TermBuf::Widgets::Context) { }
+      end
+
+      app.keymap = app.keymap.merge extra
+
+      expect(app.keymap.bindings.map &.to_s).to eq ["Tab", "Shift+Tab", "F5"]
+      expect(app.focus.scopes.first.keymap).to be app.keymap
+    end
+  end
 end

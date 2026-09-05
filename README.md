@@ -222,6 +222,63 @@ what everyone reaches for, and only a terminal speaking the kitty keyboard proto
 a plain `Enter`. `TextArea.default_accept_keys` is therefore both `Ctrl+Enter` and `Alt+Enter`, and
 `#accept_keys` takes whatever an application would rather use.
 
+### Overlays
+
+The widgets drawn over the screen rather than beside it live under
+`src/termbuf-widgets/widgets/overlay/`. Each of them is a float that is put up with `#open` and
+taken down with `#close`, and each takes the same three things with it: itself, a `Catcher` one z
+below that answers every point the overlay did not so a click cannot reach what is behind it, and
+an optional `Backdrop` one below that which dims what is there.
+
+```crystal
+dialog = TermBuf::Widgets::Dialog.new "Unsaved changes",
+  body: TermBuf::Widgets::Label.new("Save before leaving?"),
+  actions: %w[Save Discard Cancel]
+dialog.open app
+```
+
+A modal overlay pushes a focus scope with itself as the root, so tab moves inside it and a key
+nothing in it claims stops there rather than reaching the window behind. Closing pops the scope and
+gives the keyboard back to whatever had it. The overlay stays in the tree, hidden, so opening it
+again costs nothing and the message it emits on the way down still has a parent to reach.
+
+* **`Dialog`** — a centred box with a title, a body and a `ButtonGroup` of actions. Modal with a
+  backdrop by default. `Escape` closes it with nothing chosen and `Enter` presses the default
+  action; either way it says `Dialog::Closed` carrying the index of the action or `nil`.
+  `Dialog.confirm` and `Dialog.alert` are the two everyone writes anyway.
+* **`Popover`** — a box hanging off another widget by a pair of `Layout::AttachPoint`s, which flips
+  to the other side of its target rather than going off the screen. Not modal: the rest of the
+  screen keeps the keyboard. A click anywhere else takes it down instead of pressing what it landed
+  on.
+* **`DropdownMenu`** — a popover holding a `VirtualList` of items, each with an optional key hint,
+  an enabled flag and a submenu marker. Up and down move past anything disabled, `Enter` and a
+  click choose, and it says `DropdownMenu::Selected`. There is no menu bar: a row of buttons each
+  opening one of these is what a menu bar is.
+* **`Drawer`** — a panel against one edge of the screen, as long as that edge and `#size` cells
+  deep. Nothing animates; a program wanting it to slide moves `#size` a cell at a time between
+  frames. Says `Drawer::Closed`.
+* **`Toasts`** — a stack of short messages in a corner. The newest is always nearest the corner, so
+  a bottom stack grows upward and a top one downward; past `#max_visible` the oldest is pushed off.
+  A click takes one down, and so does its time running out.
+* **`HelpOverlay`** — a dialog listing `Router#active_bindings` for the chain the keyboard is in,
+  grouped by the widget each binding came from and scrolling when there are more than fit.
+  `HelpOverlay.install app` binds it to `F1` and `?` by merging them into `App#keymap`, which
+  leaves whatever was bound there.
+
+#### Timers
+
+Nothing in the widget layer opens a device, and a clock is a device. An application that wants a
+toast to time out hands `App` the terminal's:
+
+```crystal
+app.after = ->(span : Time::Span) { terminal.after span }
+app.cancel = ->(nonce : UInt64) { terminal.cancel nonce }
+```
+
+`App#after(span) { ... }` then arms one and runs the block when the `TermBuf::Events::Timer`
+arrives; `App#cancel(nonce)` withdraws it. Without those two procs nothing is armed and a toast
+stays up until it is clicked.
+
 ## Development
 
 ```bash
