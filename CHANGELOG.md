@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- `Layout::Sizing.percent` is a share of what is left rather than of the whole content box: the
+  parent's box, less the gaps between its children, less every sibling already settled at a size,
+  meaning the `Fixed` ones and the `Fit` ones. `Grow` siblings still take what the percents leave.
+  A row of two fifty percent panes with a one-cell rule between them now fills its box exactly,
+  where before the pair claimed the rule's cell as well and the row overflowed by one.
+- `Split` no longer asks that the rule's cell be left out of its panes' percentages.
+
 ### Added
 
 - Six more display widgets, under `src/termbuf-widgets/widgets/display/`: `Spinner`, `Clock`,

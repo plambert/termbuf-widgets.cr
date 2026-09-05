@@ -22,6 +22,20 @@ dependencies:
 That pulls in termbuf, which is the drawing side, and
 [termbuf-input](https://github.com/plambert/termbuf-input.cr) behind it.
 
+## Layout
+
+Every widget asks to be sized on each axis with a `Layout::Sizing`, and there are four ways to ask:
+
+* `fixed` takes exactly the cells it names.
+* `fit` takes what the content needs, and no more.
+* `percent` takes that share, in hundredths, of what is left of the parent's content box: the box
+  less the gaps between the children, less every sibling already settled at a size, which means the
+  fixed ones and the fitting ones. Two panes at fifty each with a one-cell rule between them fill
+  the box, rather than claiming the rule's cell twice over and overflowing by one.
+* `grow` divides whatever is still over, by weight.
+
+Each of the four is held inside its own `min` and `max`.
+
 ## Widgets
 
 ### Display

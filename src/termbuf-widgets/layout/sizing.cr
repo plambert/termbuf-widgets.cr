@@ -61,8 +61,8 @@ module TermBuf::Widgets::Layout
   #
   # The four modes are resolved in the order they can be: `Fixed` is known
   # before anything else, `Fit` comes from the content, `Percent` is a share
-  # of the parent's content box, and `Grow` divides whatever is left. `min`
-  # and `max` bound the result in every mode.
+  # of what those two left of the parent's content box, and `Grow` divides
+  # whatever is still over. `min` and `max` bound the result in every mode.
   struct Sizing
     enum Mode
       # As large as the content needs, and no larger.
@@ -74,7 +74,8 @@ module TermBuf::Widgets::Layout
       # Exactly the number of cells given.
       Fixed
 
-      # A share of the parent's content box, in hundredths.
+      # A share, in hundredths, of what the parent's content box has left
+      # once the gaps and the settled siblings have taken theirs.
       Percent
     end
 
@@ -114,7 +115,11 @@ module TermBuf::Widgets::Layout
       new Mode::Fixed, cells, cells
     end
 
-    # *percent* hundredths of the parent's content box on this axis.
+    # *percent* hundredths of what is left of the parent's content box on this
+    # axis: the box less the gaps between the children and less every sibling
+    # already settled at a size, meaning the `Fixed` ones and the `Fit` ones.
+    # Two panes at fifty each with a one-cell rule between them fill the box,
+    # rather than claiming the rule's cell twice over and overflowing by one.
     def self.percent(percent : Int32) : Sizing
       raise ArgumentError.new "percent #{percent} is outside 0..100" unless 0 <= percent <= 100
 

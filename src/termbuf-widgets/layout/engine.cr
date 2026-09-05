@@ -25,9 +25,10 @@ module TermBuf::Widgets::Layout
   #    row the sum of its children plus gaps and inset, a column the widest of
   #    them. `Sizing::Mode::Grow` and `Percent` count as nothing here, because
   #    what they get is not known until their parent's width is.
-  # 2. `distribute_widths` top down. Percent children take their share of the
-  #    content box, then what is left over is either grown into or, when it is
-  #    negative, shrunk out of the `Fit` and `Grow` children.
+  # 2. `distribute_widths` top down. Percent children take their share of what
+  #    the `Fixed` and `Fit` children left of the content box, then what is
+  #    still over is either grown into or, when it is negative, shrunk out of
+  #    the `Fit` and `Grow` children.
   # 3. `wrap_text`: every leaf now knows how wide it is, so it can say how
   #    tall it turns out to be.
   # 4. `fit_heights`, as 1.
@@ -35,11 +36,12 @@ module TermBuf::Widgets::Layout
   # 6. `position` top down, laying the children out along the axis from the
   #    content origin and aligning what is left over.
   #
-  # Two deliberate differences from Clay: a border consumes cells rather than
-  # being drawn over them, and shrinking is proportional rather than taking
-  # from the largest child first, so a row compressed by one column loses it
-  # from wherever the rounding puts it rather than from whichever child
-  # happens to be widest.
+  # Three deliberate differences from Clay: a border consumes cells rather than
+  # being drawn over them, shrinking is proportional rather than taking from
+  # the largest child first, so a row compressed by one column loses it from
+  # wherever the rounding puts it rather than from whichever child happens to
+  # be widest, and a percent is a share of the space its settled siblings left
+  # rather than of the whole content box.
   module Engine
     extend self
 
@@ -215,10 +217,10 @@ module TermBuf::Widgets::Layout
     # Each slot's own share of *total*, *whole* being what the weights are
     # shares of rather than a sum to divide up.
     #
-    # This is what a percent is: 30 of 100 of the box, whether or not its
-    # siblings claim the other 70, and a share held back by a bound of its own
-    # moves nothing else. Boundaries again, so the shares of a whole hundred
-    # come to exactly *total*.
+    # This is what a percent is: 30 of 100 of what it was handed, whether or
+    # not its siblings claim the other 70, and a share held back by a bound of
+    # its own moves nothing else. Boundaries again, so the shares of a whole
+    # hundred come to exactly *total*.
     def share_of(slots : Array(Slot), total : Int32, whole : Int32) : Array(Int32)
       return Array(Int32).new(slots.size, 0) if whole <= 0
 
@@ -381,7 +383,7 @@ module TermBuf::Widgets::Layout
                                  content : Int32, axis : Axis) : Nil
       base = Math.max 0, content - gap_total(widget, children.size)
 
-      apply_percent children, base, axis
+      apply_percent children, percent_base(children, base, axis), axis
 
       # A grower has been given nothing yet, but it can never come out below
       # its own minimum, so that much of the box is already spoken for. Count
@@ -446,6 +448,23 @@ module TermBuf::Widgets::Layout
         # the parent even when its own minimum says otherwise.
         set_size child, axis, Math.min(Math.max(value, min_of(child, axis)), content)
       end
+    end
+
+    # What the percents are percents of: the run of cells left once the
+    # siblings whose size is already settled have taken theirs.
+    #
+    # `Fixed` is settled before the layout starts and `Fit` by the pass that
+    # measured the content, so both are off the table by the time the shares
+    # are worked out; `Grow` is not, and takes what the percents leave. Deduct
+    # them or a fixed rule between two fifty percent panes pushes the pair one
+    # cell past the box that was meant to hold all three.
+    private def percent_base(children : Array(Widget), base : Int32, axis : Axis) : Int32
+      settled = children.sum do |child|
+        sizing = sizing_of child, axis
+        sizing.fixed? || sizing.fit? ? size_of(child, axis) : 0
+      end
+
+      Math.max 0, base - settled
     end
 
     # Gives every `Percent` child its share of *base*, by the same boundaries

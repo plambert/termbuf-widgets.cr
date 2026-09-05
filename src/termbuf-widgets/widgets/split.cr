@@ -15,11 +15,6 @@ module TermBuf::Widgets
   # size and the second to grow, which is the only pair of sizings where
   # dragging means what it looks like it means: the pane you sized stays where
   # you put it and the other one takes whatever is left.
-  #
-  # Percent panes are a share of the whole content box rather than of what
-  # their siblings left, so two of them adding to a hundred claim the rule's
-  # cell as well and the row overflows by one. Leave the rule out of the
-  # percentages: 25 and 70, not 25 and 75.
   class Split < Panel
     # The pane before the rule.
     getter first : Widget

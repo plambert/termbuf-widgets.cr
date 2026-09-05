@@ -168,9 +168,9 @@ module Fixtures
     # Along the stacking axis the children fit, unless what they insist on will
     # not; and a grower with no ceiling leaves nothing behind.
     #
-    # What a child insists on is its minimum, except for a percent child: its
-    # share is of the whole content box rather than of what its siblings left,
-    # and nothing shrinks it afterwards, so what it took is what it demands.
+    # What a child insists on is its minimum, except for a percent child:
+    # nothing shrinks its share afterwards, so what it took is what it
+    # demands.
     private def check_main(widget : Widget, children : Array(Widget),
                            content : TermBuf::Rect, axis : Axis) : String?
       room = extent content, axis
@@ -217,12 +217,20 @@ module Fixtures
 
     # Every percent child took the share the boundary formula gives it,
     # whenever no bound of its own got in the way.
+    #
+    # The base is the content box less the gaps and less the siblings already
+    # settled at a size, which is what a percent is a percent of. A `Fit`
+    # sibling is one of those, and its settled size is the one it was measured
+    # at; a row with no room left shrinks it afterwards, and there is then no
+    # way to read that size back off the tree. `#squeezed?` is where that is
+    # given up on.
     private def check_percent(widget : Widget, children : Array(Widget),
                               content : TermBuf::Rect, axis : Axis) : String?
       shares = children.select { |child| sizing_of(child, axis).percent? }
       return if shares.empty?
+      return if squeezed? widget, children, content, axis
 
-      base = Math.max 0, extent(content, axis) - gap_total(widget, children.size)
+      base = percent_base children, extent(content, axis) - gap_total(widget, children.size), axis
       cumulative = 0
       previous = 0
       expected = shares.map do |child|
@@ -246,6 +254,33 @@ module Fixtures
       end
 
       nil
+    end
+
+    # What the percents were percents of: *room*, the content box less the
+    # gaps, less every sibling settled at a size before the shares were worked
+    # out.
+    private def percent_base(children : Array(Widget), room : Int32, axis : Axis) : Int32
+      settled = children.sum do |child|
+        sizing = sizing_of child, axis
+        sizing.fixed? || sizing.fit? ? extent(child.rect, axis) : 0
+      end
+
+      Math.max 0, room - settled
+    end
+
+    # Whether a `Fit` child of *widget* may have been shrunk after the percent
+    # shares were handed out, which is the one case where the size it is
+    # carrying now is not the size the shares were worked out against.
+    #
+    # Shrinking runs only when the children come to more than the box holds,
+    # and it leaves them filling it or overflowing it, so a box with room to
+    # spare cannot have been through it.
+    private def squeezed?(widget : Widget, children : Array(Widget),
+                          content : TermBuf::Rect, axis : Axis) : Bool
+      return false unless children.any? { |child| sizing_of(child, axis).fit? }
+
+      used = children.sum { |child| extent child.rect, axis } + gap_total(widget, children.size)
+      used >= extent content, axis
     end
 
     # Nothing in the flow landed off the screen, in a tree where nothing

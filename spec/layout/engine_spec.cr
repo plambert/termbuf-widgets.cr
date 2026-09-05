@@ -69,6 +69,21 @@ Spectator.describe Layout::Engine do
       expect(child.rect.width).to eq 8
       expect(child.rect.x).to eq 2
     end
+
+    # The rule between two halves is the case the rule exists for: a percent
+    # that ignored it would claim its cell as well and overflow by one.
+    it "shares what a fixed sibling left rather than the whole box" do
+      rule = Box.new
+      rule.width = Sizing.fixed 1
+      panes = percent_row [50, 50]
+
+      expect(row_widths([panes[0], rule, panes[1]], 21)).to eq [10, 1, 10]
+    end
+
+    it "shares what a fitting sibling left as well" do
+      children = [Box.sized(3)] + percent_row([25, 75])
+      expect(row_widths(children, 11)).to eq [3, 2, 6]
+    end
   end
 
   describe "grow sizing" do

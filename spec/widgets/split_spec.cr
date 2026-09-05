@@ -29,15 +29,26 @@ Spectator.describe TermBuf::Widgets::Split do
       expect(made.second.rect.width).to eq 6
     end
 
-    # A percent is a share of the whole content box, so the rule's own cell has
-    # to be left out of the percentages or the row overflows by one.
+    # A percent is a share of what the rule left, so two halves fill the box
+    # between them rather than overflowing it by the rule's own cell.
     it "shares it by percent when that is what they ask for" do
       made = split
-      made.first.width = Sizing.percent 25
-      made.second.width = Sizing.percent 70
+      made.first.width = Sizing.percent 50
+      made.second.width = Sizing.percent 50
 
-      Layout::Tree.new(made, Rect.full(13, 2)).layout
-      expect(made.first.rect.width).to eq 3
+      Layout::Tree.new(made, Rect.full(21, 2)).layout
+      expect(made.first.rect.width).to eq 10
+      expect(made.divider.rect.width).to eq 1
+      expect(made.second.rect.width).to eq 10
+    end
+
+    it "gives the odd cell to the first of two halves" do
+      made = split
+      made.first.width = Sizing.percent 50
+      made.second.width = Sizing.percent 50
+
+      Layout::Tree.new(made, Rect.full(20, 2)).layout
+      expect(made.first.rect.width).to eq 10
       expect(made.second.rect.width).to eq 9
     end
 
