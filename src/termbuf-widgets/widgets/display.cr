@@ -21,6 +21,8 @@
 #   words for the terminals that draw no pictures.
 # * `TermBuf::Widgets::Hyperlink` — text that points somewhere, and says where
 #   when you look at it.
+# * `TermBuf::Widgets::CopyButton` — a button that puts something on the
+#   clipboard and says it did.
 #
 # Most of them are leaves: each says how wide it wants to be, how tall it turns
 # out at that width, and draws into the box the layout gave it. None owns a
@@ -38,6 +40,7 @@ require "./display/date_display"
 require "./display/picture"
 require "./display/icon"
 require "./display/hyperlink"
+require "./display/copy_button"
 require "./display/status_bar"
 require "./display/progress_bar"
 require "./display/single_value"
