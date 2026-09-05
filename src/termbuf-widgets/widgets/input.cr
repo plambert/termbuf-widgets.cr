@@ -1,3 +1,5 @@
 require "./input/interactive"
 require "./input/button"
 require "./input/button_group"
+require "./input/checkbox"
+require "./input/checkbox_group"
