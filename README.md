@@ -26,10 +26,10 @@ That pulls in termbuf, which is the drawing side, and
 
 ### Display
 
-Widgets that show a number or a state and take no input, with the one exception of a `Rating` told
-it is editable. Each is a leaf: it says how wide it wants to be, how tall it turns out at that
-width, and draws into the box the layout gave it. None owns a timer, so anything that moves is
-advanced by whatever is driving the frames.
+Widgets that show a number, a state or a time, and mostly take no input. Each says how wide it wants
+to be, how tall it turns out at that width, and draws into the box the layout gave it. None owns a
+clock: the three that move on their own arm a timer through `App#after`, which an application wires
+to its terminal, and the ones that move without one are advanced by whatever is driving the frames.
 
 * `StatusBar` — label and value pairs on one row, separators configurable, cut from the right with
   an ellipsis when the row is too narrow
@@ -44,6 +44,29 @@ advanced by whatever is driving the frames.
   than rounding to a whole base
 * `Rating` — a value out of a maximum drawn in stars, read-only by default, editable with the
   arrow keys, `Home`, `End`, the digit keys and a click
+* `Spinner` — a frame of an animation that says work is going on, turned by a timer it arms
+  through `App#after` and arms again after every tick. Every frame is drawn in the same number of
+  cells, so turning one costs no layout
+* `Clock` — the time of day in a `Time::Format` string, armed for the next whole second (or
+  whatever `#resolution` says) rather than for a flat interval, so the reading changes when the
+  clock on the wall does
+* `RelativeTime` — "3 minutes ago" or "in 2 hours", with the unit chosen to keep the number small
+  and a refresh that slows down as the time it describes ages: every second while it is new, once
+  a day once it is a day old
+* `DateDisplay` — a date in a `Time::Format` string, with no timer, because a date does not change
+* `Icon` — one glyph, with a plainer spelling taken whenever the first would not come out at the
+  width the icon reserved. An optional picture goes over it where the terminal draws pictures
+* `Picture` — a picture over the cells it is given, asked for through `TermBuf::ImageStore#place`,
+  with alt text underneath for the terminals that draw none. Named `Picture` because
+  `TermBuf::Image` is what it holds
+* `Hyperlink` — text carrying an OSC 8 link, which reveals the whole address on a second row (or
+  after it) once the keyboard reaches it. `Enter` and a click say `Hyperlink::Activated`, and `c`
+  copies the address through `App#copy`
+* `CopyButton` — a `Button` that copies what a block answers, flashes a label to say it did, and
+  is disabled with a label saying so where there is no clipboard
+
+The last four want something the widget layer does not own — a clock, the clipboard, an image
+store — so an application hands them the whole `App` and they ask it. See `Ticking` and `Copyable`.
 
 ```crystal
 bar = TermBuf::Widgets::ProgressBar.new 0.4
@@ -51,6 +74,16 @@ bar.label = TermBuf::Widgets::ProgressBar::Placement::Centre
 
 stars = TermBuf::Widgets::Rating.new 3.5
 stars.editable = true
+
+app.after = ->(span : Time::Span) { terminal.after span }
+app.cancel = ->(nonce : UInt64) { terminal.cancel nonce; nil }
+app.copy = ->(text : String) { terminal.clipboard.copy text }
+
+spinner = TermBuf::Widgets::Spinner.new "working"
+spinner.start app
+
+link = TermBuf::Widgets::Hyperlink.new "the protocol", "https://example.com"
+link.attach app
 ```
 
 ### Data

@@ -9,6 +9,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- Six more display widgets, under `src/termbuf-widgets/widgets/display/`: `Spinner`, `Clock`,
+  `RelativeTime`, `DateDisplay`, `Icon`, `Picture`, `Hyperlink` and `CopyButton`. The glyph ones
+  measure their preferred spelling under the tree's width policy and take a plainer one where it
+  would come out ragged, the way `Rating` already did.
+- `Ticking` and `Copyable`, two mixins over `Attached`, which is how a widget reaches the clock and
+  the clipboard the widget layer does not own: an application hands the widget the whole `App` with
+  `#attach`, and a widget nobody attached simply never ticks and copies nothing. `Ticking` asks
+  `#interval` again after every tick, so a `RelativeTime` slows its own refresh down as it ages and
+  a `Clock` arms for the next whole second rather than for a flat span.
+- `App#copy`, the proc an application wires to `TermBuf::Terminal#clipboard`, beside the `App#after`
+  and `App#cancel` it already had. Nothing is written where it is `nil`, and a `CopyButton` draws
+  itself unavailable rather than looking as though it worked.
+- `Readout`, the base for a widget drawing one line of text it works out for itself, as against a
+  `Label` drawing text it was handed.
+- `examples/widgets.cr` has a sixth page, chosen with `6`: a spinner, a clock, a relative time, a
+  date, icons, a picture, a link that shows its address when the keyboard reaches it, and a button
+  that copies it.
+
 - The overlay group of widgets, under `src/termbuf-widgets/widgets/overlay/`: `Dialog`, `Popover`,
   `DropdownMenu`, `Drawer`, `Toast` with the `Toasts` that owns them, and `HelpOverlay`. Each is a
   float put up with `#open` and taken down with `#close`; a modal one pushes a focus scope with

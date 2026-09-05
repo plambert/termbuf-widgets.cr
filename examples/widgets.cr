@@ -1,16 +1,17 @@
-# The primitives, on four pages: a split with a rule you can drag over a
+# The primitives, on six pages: a split with a rule you can drag over a
 # virtualized list and a scroll panel, a table of a hundred thousand rows in
-# fixed columns, a tree that loads a level at a time, and the navigation
-# widgets.
+# fixed columns, a tree that loads a level at a time, the navigation widgets,
+# the overlays, and the display widgets that move on their own.
 #
 #     crystal run examples/widgets.cr
 #
-# Press 1, 2, 3 and 4 for the pages. On every one of them Tab moves the
-# keyboard, the arrows and the page keys move the selection, and the wheel
-# scrolls whatever is under the pointer. On the panes page the rule between
-# them can be dragged; on the tree page Right and Left open and close a node;
-# on the navigation page Ctrl+PageUp and Ctrl+PageDown move between tabs.
-# Press q to leave.
+# Press 1 to 6 for the pages. On every one of them Tab moves the keyboard, the
+# arrows and the page keys move the selection, and the wheel scrolls whatever
+# is under the pointer. On the panes page the rule between them can be dragged;
+# on the tree page Right and Left open and close a node; on the navigation page
+# Ctrl+PageUp and Ctrl+PageDown move between tabs; on the display page the link
+# reveals its address when the keyboard reaches it, Enter follows it and c
+# copies it. Press q to leave.
 #
 # None of the three holds a widget per row. Scrolling to the hundred thousandth
 # row costs the same as scrolling to the third, because only the rows in the
@@ -237,14 +238,108 @@ class OverlayPage < Widgets::Panel
   end
 end
 
+# The display page: the widgets that say what something is, including the three
+# that move on their own.
+#
+# A spinner turns, a clock keeps up and a relative time ages, all on timers the
+# application lends them, so the page is built first and wired to one with
+# `#attach` the way the overlays page is.
+class DisplayPage < Widgets::Panel
+  # The link, which is what the keyboard lands on when the page is chosen.
+  getter link : Widgets::Hyperlink
+
+  @spinner : Widgets::Spinner
+  @clock : Widgets::Clock
+  @ago : Widgets::RelativeTime
+  @copy : Widgets::CopyButton
+
+  URL = "https://sw.kovidgoyal.net/kitty/graphics-protocol/"
+
+  def initialize(accent : TermBuf::Style)
+    @spinner = Widgets::Spinner.new "working"
+    @clock = Widgets::Clock.new "%H:%M:%S"
+    @ago = Widgets::RelativeTime.new Time.local - 90.seconds
+    @link = Widgets::Hyperlink.new "the graphics protocol", URL
+    @copy = Widgets::CopyButton.new "copy the address", -> { URL }
+
+    super direction: Widgets::Layout::Direction::Column,
+      width: Widgets::Layout::Sizing.grow,
+      height: Widgets::Layout::Sizing.grow,
+      padding: Widgets::Layout::Padding.all(1),
+      gap: 1,
+      border: Widgets::Border.rounded(title: " display ", style: accent)
+
+    add moving_row, stamps_row, icons_row, @link, @copy
+  end
+
+  # Wires the page to *app*: the link and the button want its clipboard, and
+  # the three moving widgets want its clock.
+  def attach(app : Widgets::App) : Nil
+    @link.attach app
+    @copy.attach app
+    @spinner.start app
+    @clock.start app
+    @ago.start app
+  end
+
+  # A spinner and a bar, which are the two ways of saying work is going on.
+  private def moving_row : Widgets::Widget
+    bar = Widgets::ProgressBar.new 0.62,
+      width: Widgets::Layout::Sizing.fixed(24),
+      label: Widgets::ProgressBar::Placement::Centre
+
+    row = Widgets::Panel.new direction: Widgets::Layout::Direction::Row, gap: 3
+    row.add @spinner, bar
+    row
+  end
+
+  # The time now, the date, and how long ago something was.
+  private def stamps_row : Widgets::Widget
+    row = Widgets::Panel.new direction: Widgets::Layout::Direction::Row, gap: 3
+    row.add @clock, Widgets::DateDisplay.new(Time.local), @ago
+    row
+  end
+
+  # Glyphs with a plainer spelling behind each of them, and a picture nothing
+  # but a terminal with the graphics protocol will show.
+  private def icons_row : Widgets::Widget
+    row = Widgets::Panel.new direction: Widgets::Layout::Direction::Row, gap: 2
+    row.add Widgets::Icon.new("★", fallback: "*"),
+      Widgets::Icon.new("●", fallback: "o"),
+      Widgets::Icon.new("📁", fallback: "[]"),
+      Widgets::Rating.new(3.5),
+      Widgets::Picture.new(swatch, columns: 8, rows: 2, alt: "[no pictures]")
+    row
+  end
+
+  # A small gradient, made here rather than read off disk so the example needs
+  # nothing beside it.
+  private def swatch : TermBuf::Image
+    side = 32
+    pixels = Bytes.new side * side * 3
+    side.times do |row|
+      side.times do |column|
+        at = (row * side + column) * 3
+        pixels[at] = (column * 255 // side).to_u8
+        pixels[at + 1] = (row * 255 // side).to_u8
+        pixels[at + 2] = 160_u8
+      end
+    end
+
+    TermBuf::Image.rgb pixels, side, side
+  end
+end
+
 TermBuf::Terminal.open do |terminal|
   accent = TermBuf::Style::DEFAULT.fg TermBuf::Color.rgb(120, 180, 250)
   faint = TermBuf::Style::DEFAULT.faint
 
   overlays = OverlayPage.new accent
+  display = DisplayPage.new accent
   pages = [panes_page(accent), table_page(accent), tree_page(accent),
            navigation_page(accent),
-           {overlays.as(Widgets::Widget), overlays.buttons.first.as(Widgets::Widget)}]
+           {overlays.as(Widgets::Widget), overlays.buttons.first.as(Widgets::Widget)},
+           {display.as(Widgets::Widget), display.link.as(Widgets::Widget)}]
 
   body = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
     width: Widgets::Layout::Sizing.grow,
@@ -259,7 +354,7 @@ TermBuf::Terminal.open do |terminal|
   header.width = Widgets::Layout::Sizing.grow
 
   footer = Widgets::Label.new " 1 panes · 2 table · 3 tree · 4 navigation · 5 overlays · " \
-                              "f1 keys · tab moves focus · q to leave"
+                              "6 display · f1 keys · tab moves focus · q to leave"
   footer.style = faint
   footer.width = Widgets::Layout::Sizing.grow
 
@@ -296,7 +391,17 @@ TermBuf::Terminal.open do |terminal|
   # only because the application handed over the terminal's.
   app.after = ->(span : Time::Span) { terminal.after span }
   app.cancel = ->(nonce : UInt64) { terminal.cancel nonce; nil }
+
+  # The same bargain for the clipboard: the terminal owns the connection to the
+  # window system, and a widget that copies is handed the application.
+  app.copy = ->(text : String) { terminal.clipboard.copy text }
+
+  # And for pictures, which a widget asks for through the store rather than
+  # drawing itself.
+  app.images = terminal.images
+
   overlays.attach app
+  display.attach app
   Widgets::HelpOverlay.install app
 
   app.frame
