@@ -86,6 +86,51 @@ tree = TermBuf::Widgets::Tree.new TermBuf::Widgets::Nodes.from(roots,
   label: ->(path : Path) { path.basename })
 ```
 
+### Navigation
+
+Widgets that say where you are and let you go somewhere else. Three of them draw their own items
+rather than holding a widget each: giving up a label but not the item it belongs to is a decision
+about the whole row, and the layout engine apportions space between children without ever asking
+one to spell itself differently.
+
+* `NavigationBar` — a row (or column) of items, each with a label, an optional key hint and an
+  optional message or proc to run when it is activated. The arrows along the bar move the
+  highlight, `Enter` and a click activate, and it says `NavigationBar::Selected`. A brand sits at
+  the start and a trailing slot at the far end. As the row runs out of room it gives up the
+  trailing slot, then the brand, then the labels for the key hints, then the hints for one mark
+  per item
+* `TabbedPanels` — a tab strip over a panel showing one child at a time. The tabs that are not
+  showing are hidden widgets, so the layout engine skips them: twenty tabs open cost the layout of
+  one. `Ctrl+PageUp` and `Ctrl+PageDown` move between them from anywhere inside, and moving takes
+  the keyboard into whatever is now showing; the strip takes the keyboard too, where the arrows
+  move between tabs and `Enter` steps down into one. A closable tab gets a close glyph. Says
+  `TabbedPanels::Changed` and `TabbedPanels::Closed`
+* `Breadcrumbs` — the path to here, joined by a separator glyph. A crumb given a URI is written as
+  an OSC 8 hyperlink as well as being clickable, and a click says `Breadcrumbs::Selected`. Crumbs
+  are given up from the left with a leading ellipsis, and the last crumb — where you are — is the
+  one kept whole
+* `Pagination` — previous and next `Button`s around the page numbers, with a gap standing in for
+  the runs that are not shown. The first page, the last page and `#window` pages either side of
+  the one showing always have a number of their own; a run of exactly one page is shown rather
+  than hidden behind a gap that is wider than it. `Left`, `Right`, `Home` and `End` move, and it
+  says `Pagination::Changed`
+* `Disclosure` — a header that opens and closes what is under it, and `DisclosureGroup` to make a
+  set of them an accordion. `#expanded` is a layout property because a closed section is out of
+  the layout entirely: it costs one row whatever is in it. `Enter`, `Space` and a click turn one
+  over and say `Disclosure::Toggled`
+
+```crystal
+bar = TermBuf::Widgets::NavigationBar.new brand: "termbuf"
+bar.add "files", hint: "F1"
+
+panels = TermBuf::Widgets::TabbedPanels.new
+panels.add "source", editor
+panels.add "output", log, closable: true
+
+sections = TermBuf::Widgets::DisclosureGroup.new exclusive: true
+sections.add("advanced").body.add checkbox
+```
+
 ### Input
 
 The widgets a form is made of live under `src/termbuf-widgets/widgets/input/`. Each of them says

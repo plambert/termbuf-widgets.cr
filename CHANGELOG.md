@@ -43,3 +43,27 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `MaskedField`, a validated field drawing a mark for every character, with `#value` for the text
   as typed and `#reveal?` for showing it. The mark is measured the way a checkbox's marks are, and
   the scrolling is counted in marks rather than in cells.
+- The navigation group of widgets, under `src/termbuf-widgets/widgets/navigation/`:
+  `NavigationBar`, `TabbedPanels`, `Breadcrumbs`, `Pagination`, `Disclosure` and
+  `DisclosureGroup`.
+- `NavigationBar`, a row or column of places to go with a brand at the start and a trailing slot at
+  the far end. The arrows move the highlight, `Enter` and a click activate, and it says
+  `NavigationBar::Selected` followed by whatever the item itself carries. Too narrow, it gives up
+  the trailing slot, then the brand, then the labels for their key hints, then the hints for one
+  mark each.
+- `TabbedPanels`, a tab strip over a panel showing one child at a time. Hidden tabs are hidden
+  widgets, so twenty tabs open cost the layout of one. `Ctrl+PageUp` and `Ctrl+PageDown` move
+  between them and take the keyboard into what is now showing; the strip answers the arrows and
+  `Enter`, and a closable tab gets a close glyph. Says `TabbedPanels::Changed` and
+  `TabbedPanels::Closed`.
+- `Breadcrumbs`, the path to here joined by a separator glyph. A crumb with a URI is written as an
+  OSC 8 hyperlink as well as being clickable, and crumbs are given up from the left with a leading
+  ellipsis, the last one kept whole.
+- `Pagination`, previous and next buttons around numbered page buttons with a gap standing in for
+  the runs that are not shown. A run of exactly one page is shown rather than hidden behind a gap
+  wider than it. `Left`, `Right`, `Home` and `End` move, and it says `Pagination::Changed`.
+- `Disclosure` and `DisclosureGroup`. `#expanded` is a layout property, so a closed section costs
+  one row whatever is in it; an exclusive group is an accordion. Says `Disclosure::Toggled`.
+- `Linking.link_id`, which interns a hyperlink through whatever surface a widget is drawing on by
+  walking out through the views to the buffer or terminal underneath.
+- `examples/widgets.cr` has a fourth page, chosen with `4`: the navigation widgets on one screen.
