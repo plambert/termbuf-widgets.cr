@@ -58,6 +58,19 @@ module TermBuf::Widgets
     # What to run when each armed timer goes off, by the nonce naming it.
     @timers = {} of UInt64 => Proc(Nil)
 
+    # How the application puts text on the system clipboard, or `nil` for one
+    # with no clipboard behind it.
+    #
+    # `TermBuf::Terminal#clipboard` is what a program hands over, the same way
+    # it hands over the clock:
+    #
+    #     app.copy = ->(text : String) { terminal.clipboard.copy text }
+    #
+    # Nothing in the widget layer opens a device, and a clipboard is one. Left
+    # `nil`, a widget that wanted to copy says so — a `CopyButton` draws itself
+    # unavailable rather than pretending — and nothing is written.
+    property copy : Proc(String, Nil)? = nil
+
     # Called with every event the tree did not claim. What a program hangs its
     # own quit key or its resize bookkeeping from.
     property on_event : Proc(Event, Nil)? = nil

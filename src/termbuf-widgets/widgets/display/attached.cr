@@ -85,4 +85,31 @@ module TermBuf::Widgets
       end
     end
   end
+
+  # Putting text on the system clipboard, through whatever the application
+  # wired `App#copy` to.
+  #
+  # The terminal is the only thing in the picture with a connection to the
+  # window system, and the widget layer does not own the terminal, so a widget
+  # that copies is handed the application and asks it. An application with
+  # nothing wired in takes nothing, and `#copiable?` says so before anything is
+  # tried — which is what lets a control draw itself unavailable rather than
+  # look as though it worked.
+  module Copyable
+    include Attached
+
+    # Whether there is anywhere for a copy to go.
+    def copiable? : Bool
+      !(@app.try &.copy).nil?
+    end
+
+    # Copies *text*, answering whether anything took it.
+    def copy(text : String) : Bool
+      sink = @app.try &.copy
+      return false unless sink
+
+      sink.call text
+      true
+    end
+  end
 end
