@@ -53,6 +53,39 @@ stars = TermBuf::Widgets::Rating.new 3.5
 stars.editable = true
 ```
 
+### Data
+
+Widgets that put a source of rows on the screen without building a widget per row. Each asks its
+source only for the rows that are showing, the way `VirtualList` does, so what it costs is the size
+of the window rather than the size of the data.
+
+* `Table` — rows in columns over a `Rows` source, with a header that stays put while the rows
+  scroll. A column carries a header, a `Layout::Sizing`, an alignment, a block that answers what a
+  row says in it and an optional block for what to draw that in. Cells are cut with an ellipsis and
+  measured under the tree's width policy, so a row with an emoji in it still lines up. Columns
+  wider than the table scroll sideways, and it is a `Scrolls` on both axes, so a scrollbar attaches
+  to either. Emits `Table::Selected` and `Table::Activated`
+* `DataGrid` — a `Table` with a focused column as well as a row, moved with `Left` and `Right`;
+  `Enter` opens a `Field` over the cell and a commit emits `DataGrid::Edited`; `#sort_by` orders the
+  rows through an index map, leaving the source untouched; the selection covers a row, a cell or any
+  number of rows picked with the space bar
+* `Tree` — nodes from a `Nodes` source flattened into the rows of a `VirtualList`, which the tree
+  holds as its one child. `Right` and `Left` open and close a node, `Enter` uses one, and children
+  are asked for once, the first time a node is opened, so a source that loads a level at a time
+  loads each level once. The expander glyphs fall back to ASCII on a terminal that would draw the
+  triangles two cells wide
+
+```crystal
+table = TermBuf::Widgets::Table.new TermBuf::Widgets::Rows.of(people)
+table.add_column "name", ->(person : Person) { person.name }
+table.add_column "age", ->(person : Person) { person.age.to_s },
+  TermBuf::Widgets::Layout::Sizing.fixed(3)
+
+tree = TermBuf::Widgets::Tree.new TermBuf::Widgets::Nodes.from(roots,
+  children: ->(path : Path) { entries_of path },
+  label: ->(path : Path) { path.basename })
+```
+
 ## Development
 
 ```bash

@@ -15,3 +15,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   bar's indeterminate phase is advanced by the caller.
 - `TermBuf::Input::Events::Mouse` includes `TermBuf::Widgets::Positioned`, so the router sends a
   click to whatever is under it. An editable `Rating` answers one.
+- The data group of widgets, under `src/termbuf-widgets/widgets/data/`: `Table`, `DataGrid`, `Tree`
+  and the `Nodes` source a tree reads. Each asks its source only for the rows that are showing, so
+  a table of a hundred thousand rows costs what a table of twenty does. Sorting a grid and
+  flattening a tree are the two places that ask for more, and both say so.
+- `examples/widgets.cr` has three pages now, chosen with `1`, `2` and `3`: the panes it always had,
+  a table of a hundred thousand rows, and a tree that makes each level up when it is asked for.
