@@ -44,6 +44,20 @@ module TermBuf::Widgets
     # rather than patches.
     getter keymap : Bindings
 
+    # How the application arms a timer, or `nil` for one with no clock.
+    #
+    # `TermBuf::Terminal#after` is what a program hands over; a spec hands over
+    # a counter and pushes the `TermBuf::Events::Timer` itself. Nothing in the
+    # widget layer opens a device, so the clock arrives the same way the screen
+    # and the event channel do: from whatever owns the terminal.
+    property after : Proc(Time::Span, UInt64)? = nil
+
+    # How it withdraws one. `TermBuf::Terminal#cancel`.
+    property cancel : Proc(UInt64, Nil)? = nil
+
+    # What to run when each armed timer goes off, by the nonce naming it.
+    @timers = {} of UInt64 => Proc(Nil)
+
     # Called with every event the tree did not claim. What a program hangs its
     # own quit key or its resize bookkeeping from.
     property on_event : Proc(Event, Nil)? = nil
@@ -73,9 +87,43 @@ module TermBuf::Widgets
       end
     end
 
+    # Puts a different keymap under the whole application, which is the one
+    # the base focus scope answers with after every widget has declined a key.
+    #
+    # `Keymap#merge` is how a binding is added without losing the ones that are
+    # there: `app.keymap = app.keymap.merge other`.
+    def keymap=(bindings : Bindings) : Bindings
+      @keymap = bindings
+      @focus.scopes.first.keymap = bindings
+      bindings
+    end
+
     # The widget everything else hangs from.
     def root : Widget
       @tree.root
+    end
+
+    # Arms a timer for *span* from now and answers the nonce naming it, or
+    # `nil` for an application with no clock.
+    #
+    # The block runs once, when the `TermBuf::Events::Timer` reaches `#pump`,
+    # and the registration is dropped whether or not anything is listening. A
+    # timer nobody armed — one belonging to the program rather than to a widget
+    # — is left alone and delivered into the tree like any other event.
+    def after(span : Time::Span, &block : ->) : UInt64?
+      arm = @after
+      return unless arm
+
+      nonce = arm.call span
+      @timers[nonce] = block
+      nonce
+    end
+
+    # Withdraws the timer *nonce* names, if it is one of ours.
+    def cancel(nonce : UInt64) : Nil
+      return unless @timers.delete nonce
+
+      @cancel.try &.call(nonce)
     end
 
     # The widget with the keyboard.
@@ -153,9 +201,22 @@ module TermBuf::Widgets
     # What the tree does with one event, and what happens to one it declined.
     protected def deliver(event : Event) : Nil
       resize Rect.new(0, 0, event.size.columns, event.size.rows) if event.is_a? Events::Resize
+      return if fired? event
       return if @router.dispatch event
 
       @on_event.try &.call(event)
+    end
+
+    # Whether *event* is a timer this application armed, in which case whatever
+    # armed it has now been run and the event goes no further.
+    private def fired?(event : Event) : Bool
+      return false unless event.is_a? Events::Timer
+
+      waiting = @timers.delete event.nonce
+      return false unless waiting
+
+      waiting.call
+      true
     end
 
     # Where the focused widget wants the cursor, in buffer coordinates.
