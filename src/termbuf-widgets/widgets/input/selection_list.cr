@@ -142,6 +142,14 @@ module TermBuf::Widgets
     # Whether what is typed at the list filters it.
     property? filterable : Bool
 
+    # Whether the filter is drawn above the rows.
+    #
+    # On by default, because a list that has quietly stopped showing half its
+    # options owes the user an explanation. A `Combobox` turns it off: there
+    # the filter is the text in the field, and drawing it twice says nothing
+    # the second time.
+    getter? show_filter : Bool = true
+
     # The marks to draw, or `nil` to measure and choose.
     property marks : Checkbox::Marks? = nil
 
@@ -411,6 +419,15 @@ module TermBuf::Widgets
 
     # -------------------------------------------------------- the filter
 
+    # Whether the filter line is drawn, and where it is drawn from.
+    def show_filter=(shown : Bool) : Bool
+      return shown if shown == @show_filter
+
+      @show_filter = shown
+      refresh_notice
+      shown
+    end
+
     # Holds the labels to those beginning with *text*, ignoring case.
     def filter=(text : String) : String
       return text if text == @filter
@@ -428,7 +445,7 @@ module TermBuf::Widgets
 
       row = wanted ? @indices.index(wanted) : nil
       @list.select(row || Math.min(@list.selected, Math.max(@shown.size - 1, 0)))
-      show_filter
+      refresh_notice
       invalidate_layout
     end
 
@@ -452,10 +469,10 @@ module TermBuf::Widgets
     end
 
     # The filter line, which is there only while there is a filter to show.
-    private def show_filter : Nil
+    private def refresh_notice : Nil
       @notice.text = "/#{@filter}"
       @notice.style = @filter_style
-      @notice.hidden = @filter.empty?
+      @notice.hidden = @filter.empty? || !@show_filter
     end
 
     # Moves every chosen index past *removed* down one, so the set still names
