@@ -106,11 +106,108 @@ def tree_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
   {panel, tree.list}
 end
 
+# The overlays page: a button for each of them, and the overlays they put up.
+#
+# An overlay is opened on an application, and there is no application until the
+# terminal is, so the page is built first and wired to one with `#attach`.
+class OverlayPage < Widgets::Panel
+  # The buttons, in the order they are shown.
+  getter buttons : Array(Widgets::Button)
+
+  # Where the toasts stack, or `nil` until the page is wired up.
+  getter toasts : Widgets::Toasts? = nil
+
+  @app : Widgets::App? = nil
+  @dialog : Widgets::Dialog? = nil
+  @menu : Widgets::DropdownMenu? = nil
+  @drawer : Widgets::Drawer? = nil
+  @answered : Widgets::Label
+
+  def initialize(accent : TermBuf::Style)
+    @buttons = ["dialog", "menu", "drawer", "toast"].map { |text| Widgets::Button.new text }
+    @answered = Widgets::Label.new "nothing yet"
+
+    super direction: Widgets::Layout::Direction::Column,
+      width: Widgets::Layout::Sizing.grow,
+      height: Widgets::Layout::Sizing.grow,
+      padding: Widgets::Layout::Padding.all(1),
+      gap: 1,
+      border: Widgets::Border.rounded(title: " overlays ", style: accent)
+
+    row = Widgets::Panel.new direction: Widgets::Layout::Direction::Row, gap: 2
+    @buttons.each { |button| row.add button }
+    add row, @answered
+  end
+
+  # Wires the page to *app*, which is what the overlays are opened on and where
+  # the toasts stack.
+  def attach(app : Widgets::App) : Nil
+    @app = app
+    @toasts = Widgets::Toasts.new app, corner: Widgets::Layout::AttachPoint::RightBottom
+  end
+
+  # Turns a press of one of the buttons into an overlay, and writes down what
+  # the ones that answer had to say.
+  def handle(event : TermBuf::Event, context : Widgets::Context) : Nil
+    case event
+    when Widgets::Button::Pressed        then pressed event, context
+    when Widgets::Dialog::Closed         then said "dialog: #{event.result || "cancelled"}"
+    when Widgets::DropdownMenu::Selected then said "menu: #{event.item.label}"
+    when Widgets::Drawer::Closed         then said "drawer: closed"
+    end
+  end
+
+  private def pressed(event : Widgets::Button::Pressed, context : Widgets::Context) : Nil
+    app = @app
+    return unless app
+
+    context.consume
+    case @buttons.index &.same?(event.button)
+    when 0 then confirm app
+    when 1 then menu(app).open app
+    when 2 then drawer(app).open app
+    when 3 then @toasts.try &.show("something happened at #{Time.local.to_s("%H:%M:%S")}")
+    end
+  end
+
+  private def said(what : String) : Nil
+    @answered.text = what
+  end
+
+  private def confirm(app : Widgets::App) : Nil
+    held = @dialog ||= Widgets::Dialog.new "leaving",
+      body: Widgets::Label.new("go on, then?"), actions: %w[Yes No]
+    held.open app
+  end
+
+  private def menu(app : Widgets::App) : Widgets::DropdownMenu
+    @menu ||= Widgets::DropdownMenu.new @buttons[1], {
+      Widgets::DropdownMenu::Item.new("Open", hint: "Ctrl+O"),
+      Widgets::DropdownMenu::Item.new("Save", hint: "Ctrl+S"),
+      Widgets::DropdownMenu::Item.new("Revert", enabled: false),
+      Widgets::DropdownMenu::Item.new("Export", submenu: true),
+    }
+  end
+
+  private def drawer(app : Widgets::App) : Widgets::Drawer
+    held = @drawer
+    return held if held
+
+    made = Widgets::Drawer.new Widgets::Drawer::Edge::Right, size: 24,
+      modal: true, backdrop: true, padding: Widgets::Layout::Padding.all(1),
+      border: Widgets::Border.plain(title: " drawer ")
+    made.add Widgets::Label.new("escape closes this")
+    @drawer = made
+  end
+end
+
 TermBuf::Terminal.open do |terminal|
   accent = TermBuf::Style::DEFAULT.fg TermBuf::Color.rgb(120, 180, 250)
   faint = TermBuf::Style::DEFAULT.faint
 
-  pages = [panes_page(accent), table_page(accent), tree_page(accent)]
+  overlays = OverlayPage.new accent
+  pages = [panes_page(accent), table_page(accent), tree_page(accent),
+           {overlays.as(Widgets::Widget), overlays.buttons.first.as(Widgets::Widget)}]
 
   body = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
     width: Widgets::Layout::Sizing.grow,
@@ -124,8 +221,8 @@ TermBuf::Terminal.open do |terminal|
   header.style = accent
   header.width = Widgets::Layout::Sizing.grow
 
-  footer = Widgets::Label.new " 1 panes · 2 table · 3 tree · tab moves focus · " \
-                              "arrows move the selection · q to leave"
+  footer = Widgets::Label.new " 1 panes · 2 table · 3 tree · 4 overlays · f1 keys · " \
+                              "tab moves focus · q to leave"
   footer.style = faint
   footer.width = Widgets::Layout::Sizing.grow
 
@@ -157,6 +254,13 @@ TermBuf::Terminal.open do |terminal|
   # Reporting the mouse costs the person the terminal's own text selection, so
   # nothing turns it on uninvited. A demo of dragging a rule has to.
   terminal.enable TermBuf::Tty::MOUSE_SGR
+
+  # The widget layer opens no device, and a clock is one: a toast times out
+  # only because the application handed over the terminal's.
+  app.after = ->(span : Time::Span) { terminal.after span }
+  app.cancel = ->(nonce : UInt64) { terminal.cancel nonce; nil }
+  overlays.attach app
+  Widgets::HelpOverlay.install app
 
   app.frame
   app.focus.focus pages.first[1]
