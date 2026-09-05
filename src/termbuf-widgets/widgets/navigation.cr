@@ -8,8 +8,11 @@
 #   child at a time; the others are hidden widgets and cost no layout.
 # * `TermBuf::Widgets::Breadcrumbs` — the path to here, each crumb clickable
 #   and optionally a hyperlink, cut from the left when it will not fit.
+# * `TermBuf::Widgets::Pagination` — previous and next, and the page numbers
+#   in between, with a gap standing in for the runs that are not shown.
 
 require "./navigation/links"
 require "./navigation/navigation_bar"
 require "./navigation/tabbed_panels"
 require "./navigation/breadcrumbs"
+require "./navigation/pagination"
