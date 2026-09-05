@@ -137,6 +137,19 @@ module TermBuf::Widgets
     # What the widget draws in, or `nil` to take the surface's own style.
     property style : Style? = nil
 
+    # How every cell this widget paints settles against what is already on the
+    # screen, or `nil` for a widget that simply covers it.
+    #
+    # The renderer hands this to the view the widget and everything under it
+    # draws through, so it is asked in the widget's own coordinates and applies
+    # to the ground the renderer fills as much as to anything drawn on it. What
+    # an `Overlay::Backdrop` dims a screen with.
+    #
+    # Named for what `TermBuf::Buffer#fill` calls it — a wash over what is
+    # already painted — rather than `blend`, which several widgets already use
+    # for a `TermBuf::Blend` of their own over part of what they draw.
+    property wash : Blend? = nil
+
     # The keys this widget answers, or `nil` for one that answers none.
     #
     # Every keymap in the chain from the focused widget up is offered a key at

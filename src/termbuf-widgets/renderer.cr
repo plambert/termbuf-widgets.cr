@@ -14,7 +14,8 @@ module TermBuf::Widgets
   # Styles layer the same way. A widget's `Widget#style` is merged onto the one
   # it inherited and handed to its view, so a panel that names a background
   # gives that background to everything drawn inside it without any of those
-  # widgets naming it.
+  # widgets naming it. A widget's `Widget#wash` goes to the same view, which is
+  # what settles every cell it paints against what is already there.
   #
   # The screen is never cleared. A `TermBuf::Commands::Clear` throws away the
   # scroll hints a widget left behind by calling `TermBuf::View#scroll`, and
@@ -53,7 +54,7 @@ module TermBuf::Widgets
 
       style = widget.style
       effective = style ? inherited.merge(style) : inherited
-      view = scissor(screen, clip).view local(widget.rect, clip), effective
+      view = scissor(screen, clip).view local(widget.rect, clip), effective, widget.wash
       box = framed widget
 
       view.fill box if root || style
