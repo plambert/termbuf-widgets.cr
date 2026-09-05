@@ -28,7 +28,9 @@ module TermBuf::Widgets
   # the width the table was laid out at:
   #
   # * `Layout::Sizing.fixed` takes exactly its cells.
-  # * `Layout::Sizing.percent` takes that share of the room the gaps left.
+  # * `Layout::Sizing.percent` takes that share of the room the gaps and the
+  #   settled columns left, the settled ones being the fixed and the fitting,
+  #   which is what a percent means everywhere else in the layout.
   # * `Layout::Sizing.fit` takes the width of its own header, which is the one
   #   thing that can be measured without asking for a row.
   # * `Layout::Sizing.grow` starts at its minimum and divides whatever is left
@@ -214,23 +216,43 @@ module TermBuf::Widgets
       widths = Array.new count, 0
       space = Math.max room - @column_gap * (count - 1), 0
       growers = [] of Int32
-      taken = 0
+      shares = [] of Int32
+      settled = 0
 
       @columns.each_with_index do |column, index|
         sizing = column.sizing
         widths[index] = case sizing.mode
-                        in .fixed?   then sizing.min
-                        in .percent? then sizing.clamp space * sizing.weight // 100
-                        in .fit?     then sizing.clamp Unicode.string_width(column.header, @policy)
+                        in .fixed? then sizing.min
+                        in .fit?   then sizing.clamp Unicode.string_width(column.header, @policy)
+                        in .percent?
+                          shares << index
+                          0
                         in .grow?
                           growers << index
                           sizing.min
                         end
-        taken += widths[index]
+        settled += widths[index] unless sizing.grow?
       end
+
+      taken = settled + share_out(widths, shares, Math.max(space - settled, 0))
+      taken += growers.sum { |index| widths[index] }
 
       grow widths, growers, Math.max(space - taken, 0)
       widths
+    end
+
+    # Gives each percent column its share of *left*, which is the room the
+    # settled columns did not take. Answers what they took between them.
+    private def share_out(widths : Array(Int32), shares : Array(Int32), left : Int32) : Int32
+      taken = 0
+
+      shares.each do |index|
+        sizing = @columns[index].sizing
+        widths[index] = sizing.clamp left * sizing.weight // 100
+        taken += widths[index]
+      end
+
+      taken
     end
 
     # Hands *leftover* to the growing columns by weight, left to right.

@@ -98,6 +98,17 @@ Spectator.describe TermBuf::Widgets::Table do
 
       expect(settle(made, 20).column_widths).to eq [6, 13]
     end
+
+    it "gives a percent column its share of what the settled ones left" do
+      made = Table.new Rows.of(%w[a])
+      made.add_column "fixed", ->(item : String) { item }, Sizing.fixed(4)
+      made.add_column "half", ->(item : String) { item }, Sizing.percent(50)
+      made.add_column "rest", ->(item : String) { item }, Sizing.grow
+
+      # Eighteen cells once the two gaps are off, four of them the fixed
+      # column's, and half of the fourteen that leaves is seven.
+      expect(settle(made, 20).column_widths).to eq [4, 7, 7]
+    end
   end
 
   describe "what it draws" do

@@ -13,7 +13,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   parent's box, less the gaps between its children, less every sibling already settled at a size,
   meaning the `Fixed` ones and the `Fit` ones. `Grow` siblings still take what the percents leave.
   A row of two fifty percent panes with a one-cell rule between them now fills its box exactly,
-  where before the pair claimed the rule's cell as well and the row overflowed by one.
+  where before the pair claimed the rule's cell as well and the row overflowed by one. `Table`
+  resolves its own percent columns the same way, so the sizing means one thing everywhere.
 - `Split` no longer asks that the rule's cell be left out of its panes' percentages.
 
 ### Added
