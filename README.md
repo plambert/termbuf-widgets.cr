@@ -107,6 +107,26 @@ form.add name,
   ButtonGroup.new(%w[Save Cancel])
 ```
 
+`Form` does the same job with the labels attached and the rules gathered in one place:
+
+```crystal
+form = Form.new
+form.add "name", ValidatedField.new, [Validators.required]
+form.add "port", ValidatedField.new, [Validators.numeric]
+form.add "colour", Combobox.new(Option.all(%w[amber azure beige]))
+```
+
+#### Options
+
+`SelectionList`, `Combobox` and `ListSelector` are all over `Option(T)`, a label and the value it
+stands for. What a list shows and what the application gets back are rarely the same thing, and
+the widget has no business turning one into the other:
+
+```crystal
+zones = Option.all TimeZones.all              # labelled by #to_s
+ports = [Option.new("ssh", 22), Option.new("http", 80)]
+```
+
 #### What there is
 
 * **`Button`** — a label that says `Button::Pressed` when `Enter`, `Space` or a click reaches it.
@@ -130,6 +150,24 @@ form.add name,
 * **`Validators`** — `required`, `length`, `matches`, `numeric`, `one_of`, and `all` to compose
   them. A rule is a `Proc(String, String?)`, so an application's own rules are written where they
   belong rather than as subclasses.
+* **`SelectionList`** — a window over `Option`s with a mark against the ones chosen, single or
+  multiple, capped by `max_selections`. `Space` chooses, `Enter` hands the choice over, and a
+  filterable list narrows to what is typed at it. Filtering runs through a map from the showing
+  rows to the options behind them, so a choice survives being hidden.
+* **`Combobox`** — a field with a `SelectionList` floating under it, narrowed by what is typed.
+  `Up` and `Down` move through it without the keyboard leaving the field, `Enter` takes the
+  highlighted option and says `Combobox::Chosen`, and `Escape` shuts it. `allow_custom` decides
+  whether text that is nobody's label is accepted.
+* **`KeywordList`** — a field with the keywords already typed sitting above it as chips, which
+  wrap and grow the widget as they do. `Enter` and `,` add one, completing it to a known slug;
+  `Backspace` on an empty field selects the last chip and a second one removes it.
+* **`ListSelector`** — two lists in a `Split` with a column of buttons between them. `Space`,
+  `Enter` and a click send a row across; `Tab` moves between the parts rather than between every
+  button in them, and `ordering` adds a column that moves a chosen row up and down.
+* **`Form`** — labelled fields in a column, tab order following declaration order. `#submit` asks
+  every rule — the ones given per field, a `ValidatedField`'s own, and the form's `#rules` about
+  all the values at once — and says `Form::Submitted` or `Form::Invalid` with the keyboard on the
+  first field that was refused.
 
 #### Handing the text over
 
