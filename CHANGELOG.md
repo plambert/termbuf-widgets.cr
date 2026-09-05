@@ -67,3 +67,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Linking.link_id`, which interns a hyperlink through whatever surface a widget is drawing on by
   walking out through the views to the buffer or terminal underneath.
 - `examples/widgets.cr` has a fourth page, chosen with `4`: the navigation widgets on one screen.
+- `Option(T)`, a label and the value it stands for, which is what the list widgets are over.
+- `SelectionList`, a window over options with a mark against the ones chosen. `Space` chooses,
+  `Enter` says `SelectionList::Confirmed`, and every change says `SelectionList::Changed`. A
+  multiple list is capped by `max_selections` and puts back a choice that would break it, saying
+  `SelectionList::Refused` instead. A `filterable` list narrows to what is typed at it through a
+  map from the showing rows to the options behind them, so the options are never reordered and a
+  choice survives being hidden. The marks are `Checkbox`'s, measured under the tree's own width
+  policy.
+- `Combobox`, a field with a `SelectionList` floating under it, anchored to the field and flipped
+  above it where there is no room below. Typing narrows and opens it, `Up` and `Down` move through
+  it without the keyboard leaving the field, `Enter` takes the highlighted option as
+  `Combobox::Chosen`, and `Escape` shuts it. `allow_custom` decides whether text that is nobody's
+  label is handed over with a `nil` value.
+- `KeywordList`, a field with the keywords already typed sitting above it as chips. They wrap, and
+  the widget grows downward as they do, because the chips are a widget whose `#height_for_width`
+  counts the wrapped rows. `Enter` and `,` add one, completing it to a known slug where the text
+  names exactly one; `Backspace` on an empty field selects the last chip and a second one removes
+  it; `Left`, `Right`, `Delete` and a click work on that selection.
+- `ListSelector`, two selection lists in a `Split` with a column of buttons between them. `Space`,
+  `Enter` and a click send a row across, the buttons do it for whatever the keyboard is on or for
+  the lot, and `ordering` adds a second column that moves a chosen row up and down. `Tab` moves
+  between the parts rather than between every button in them.
+- `Form`, labelled fields in a column with a submit and a cancel button. `#submit` asks the rules
+  given per field, whatever a `ValidatedField` holds itself to, and the form's own `#rules` about
+  every value at once, then says `Form::Submitted` or `Form::Invalid` with the keyboard on the
+  first field that was refused. `submit_on_enter` makes `Enter` in a field hand the form over, and
+  the accepted line is put back rather than left cleared.
