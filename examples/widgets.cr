@@ -1,14 +1,16 @@
-# The primitives, on three pages: a split with a rule you can drag over a
+# The primitives, on four pages: a split with a rule you can drag over a
 # virtualized list and a scroll panel, a table of a hundred thousand rows in
-# fixed columns, and a tree that loads a level at a time.
+# fixed columns, a tree that loads a level at a time, and the navigation
+# widgets.
 #
 #     crystal run examples/widgets.cr
 #
-# Press 1, 2 and 3 for the pages. On every one of them Tab moves the keyboard,
-# the arrows and the page keys move the selection, and the wheel scrolls
-# whatever is under the pointer. On the panes page the rule between them can be
-# dragged; on the tree page Right and Left open and close a node. Press q to
-# leave.
+# Press 1, 2, 3 and 4 for the pages. On every one of them Tab moves the
+# keyboard, the arrows and the page keys move the selection, and the wheel
+# scrolls whatever is under the pointer. On the panes page the rule between
+# them can be dragged; on the tree page Right and Left open and close a node;
+# on the navigation page Ctrl+PageUp and Ctrl+PageDown move between tabs.
+# Press q to leave.
 #
 # None of the three holds a widget per row. Scrolling to the hundred thousandth
 # row costs the same as scrolling to the third, because only the rows in the
@@ -106,11 +108,46 @@ def tree_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
   {panel, tree.list}
 end
 
+# The navigation page: everything in the navigation group at once, so that the
+# way they sit together can be seen rather than described.
+def navigation_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
+  bar = Widgets::NavigationBar.new brand: "termbuf", trailing: "v0.1"
+  bar.add "files", hint: "F1"
+  bar.add "edit", hint: "F2"
+  bar.add "view", hint: "F3"
+  bar.style = accent
+
+  crumbs = Widgets::Breadcrumbs.new %w[home projects termbuf widgets]
+  crumbs.crumbs.first.uri = "file:///"
+
+  tabs = Widgets::TabbedPanels.new height: Widgets::Layout::Sizing.grow(min: 6)
+  tabs.add "summary", Widgets::Label.new("one tab is laid out; the rest are hidden widgets")
+  tabs.add "detail", Widgets::Label.new("switching costs the layout of one subtree"),
+    closable: true
+
+  sections = Widgets::DisclosureGroup.new exclusive: true
+  sections.add("general", expanded: true).body.add Widgets::Label.new("open")
+  sections.add("advanced").body.add Widgets::Label.new("closed until it is asked for")
+
+  pages = Widgets::Pagination.new pages: 24, page: 7
+
+  panel = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
+    width: Widgets::Layout::Sizing.grow,
+    height: Widgets::Layout::Sizing.grow,
+    gap: 1,
+    padding: Widgets::Layout::Padding.all(1),
+    border: Widgets::Border.rounded(title: " navigation ", style: accent)
+  panel.add bar, crumbs, tabs, sections, pages
+
+  {panel, bar}
+end
+
 TermBuf::Terminal.open do |terminal|
   accent = TermBuf::Style::DEFAULT.fg TermBuf::Color.rgb(120, 180, 250)
   faint = TermBuf::Style::DEFAULT.faint
 
-  pages = [panes_page(accent), table_page(accent), tree_page(accent)]
+  pages = [panes_page(accent), table_page(accent), tree_page(accent),
+           navigation_page(accent)]
 
   body = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
     width: Widgets::Layout::Sizing.grow,
@@ -124,8 +161,8 @@ TermBuf::Terminal.open do |terminal|
   header.style = accent
   header.width = Widgets::Layout::Sizing.grow
 
-  footer = Widgets::Label.new " 1 panes · 2 table · 3 tree · tab moves focus · " \
-                              "arrows move the selection · q to leave"
+  footer = Widgets::Label.new " 1 panes · 2 table · 3 tree · 4 navigation · " \
+                              "tab moves focus · arrows move the selection · q to leave"
   footer.style = faint
   footer.width = Widgets::Layout::Sizing.grow
 
