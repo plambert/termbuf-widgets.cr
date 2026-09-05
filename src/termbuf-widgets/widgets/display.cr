@@ -15,6 +15,10 @@
 # * `TermBuf::Widgets::Clock` — the time of day, kept up to date.
 # * `TermBuf::Widgets::RelativeTime` — how long ago something was, in words.
 # * `TermBuf::Widgets::DateDisplay` — a date, written and left alone.
+# * `TermBuf::Widgets::Icon` — one glyph, with a plainer spelling for the
+#   terminals that would draw it ragged.
+# * `TermBuf::Widgets::Picture` — a picture over the cells it is given, with
+#   words for the terminals that draw no pictures.
 #
 # Most of them are leaves: each says how wide it wants to be, how tall it turns
 # out at that width, and draws into the box the layout gave it. None owns a
@@ -29,6 +33,8 @@ require "./display/spinner"
 require "./display/clock"
 require "./display/relative_time"
 require "./display/date_display"
+require "./display/picture"
+require "./display/icon"
 require "./display/status_bar"
 require "./display/progress_bar"
 require "./display/single_value"
