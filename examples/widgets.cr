@@ -16,16 +16,76 @@
 # None of the three holds a widget per row. Scrolling to the hundred thousandth
 # row costs the same as scrolling to the third, because only the rows in the
 # window are ever asked for.
+#
+# Every page carries a panel saying what should be on the screen and what each
+# key should do to it, because an example is a manual test and a test that does
+# not say what passing looks like is not one. The panels are written out of the
+# same constants the pages are built from, so a value changed in one place is
+# changed in both.
 require "../src/termbuf-widgets"
 
 alias Widgets = TermBuf::Widgets
 
 ROWS = 100_000
 
+# Widgets in the scroll panel on the right of the panes page.
+NOTES = 40
+
+# Where the rule between the panes starts, and the fewest cells either pane
+# can be dragged down to.
+SPLIT_AT      = 30
+SPLIT_MINIMUM =  8
+
 # How many children a node of the demonstration tree has at each level, and
 # how deep it goes.
 FANOUT = 4
 DEPTH  = 3
+
+# The pagination widget on the navigation page.
+PAGE_COUNT = 24
+PAGE_SHOWN =  7
+
+# What the rating on the display page reads, out of how many stars.
+RATING     = 3.5
+RATING_MAX =   5
+
+# How far back the relative time on the display page points.
+AGO = 90.seconds
+
+# How full the progress bar on the display page is.
+PROGRESS = 0.62
+
+# What the expectations are drawn in: quiet enough to leave the widgets the
+# eye, plain enough to read.
+EXPECTED_STYLE = TermBuf::Style::DEFAULT.faint
+
+# The panel at the top of a page: one line per thing demonstrated, saying what
+# it should show and what should happen when it is used.
+def expected(*lines : String) : Widgets::Widget
+  panel = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
+    width: Widgets::Layout::Sizing.grow,
+    padding: Widgets::Layout::Padding.symmetric(horizontal: 1),
+    border: Widgets::Border.plain(title: " expected ", style: EXPECTED_STYLE,
+      title_style: EXPECTED_STYLE)
+
+  lines.each do |line|
+    label = Widgets::Label.new line, wrap: Widgets::Layout::Wrap::Words
+    label.width = Widgets::Layout::Sizing.grow
+    label.style = EXPECTED_STYLE
+    panel.add label
+  end
+
+  panel
+end
+
+# A page: what it demonstrates, under the panel saying what it should do.
+def paged(content : Widgets::Widget, *lines : String) : Widgets::Widget
+  panel = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
+    width: Widgets::Layout::Sizing.grow,
+    height: Widgets::Layout::Sizing.grow
+  panel.add expected(*lines), content
+  panel
+end
 
 # The panes page: a virtualized list on the left and a scroll panel on the
 # right, with a rule between them that can be dragged.
@@ -48,7 +108,7 @@ def panes_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
   # A scroll panel is a window over real widgets, which is the other half of
   # the story: one row per thing, clipped rather than compressed.
   notes = Widgets::Scrollable.new
-  40.times { |index| notes.add Widgets::Label.new("note #{index}") }
+  NOTES.times { |index| notes.add Widgets::Label.new("note #{index}") }
 
   right = Widgets::Panel.new direction: Widgets::Layout::Direction::Row,
     width: Widgets::Layout::Sizing.grow,
@@ -57,9 +117,17 @@ def panes_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
   right.add notes, Widgets::Scrollbar.new(notes)
 
   split = Widgets::Split.new left, right,
-    direction: Widgets::Layout::Direction::Row, at: 30, minimum: 8
+    direction: Widgets::Layout::Direction::Row, at: SPLIT_AT, minimum: SPLIT_MINIMUM
 
-  {split, list}
+  page = paged split,
+    "Left: #{ROWS} rows, the chosen one marked ▸. Right: #{NOTES} note widgets.",
+    "Drag the rule, which starts #{SPLIT_AT} cells in: both panes resize, and " \
+    "neither is let below #{SPLIT_MINIMUM} cells.",
+    "The wheel over a pane scrolls that one, and its scrollbar follows.",
+    "Tab moves between list and notes; Up, Down, PageUp, PageDown, Home and End " \
+    "move the chosen row."
+
+  {page, list}
 end
 
 # The table page: the same hundred thousand rows, in columns this time, with a
@@ -84,7 +152,15 @@ def table_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
     border: Widgets::Border.rounded(title: " table ", style: accent)
   panel.add table, Widgets::Scrollbar.new(table)
 
-  {panel, table}
+  page = paged panel,
+    "#{ROWS} rows: row (8 cells, right), name (what is left), state (7 cells, " \
+    "ready in the accent colour every third row, a faint waiting on the rest).",
+    "The header stays where it is while the rows move under it.",
+    "End reaches row #{ROWS - 1} at once and Home row 0: a row is built only " \
+    "while it is on the screen.",
+    "A name too wide for its column ends in …; the columns keep their widths."
+
+  {page, table}
 end
 
 # The tree page: a source that makes each level up the moment it is asked for,
@@ -106,7 +182,14 @@ def tree_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
     border: Widgets::Border.rounded(title: " tree ", style: accent)
   panel.add tree, Widgets::Scrollbar.new(tree.list)
 
-  {panel, tree.list}
+  page = paged panel,
+    "root is open; #{FANOUT} children to a node, #{DEPTH} levels deep.",
+    "Right opens the chosen node, asking for its children the first time only.",
+    "Left closes an open node, or moves to the parent of a closed one.",
+    "Enter uses a leaf, which is a node #{DEPTH} deep.",
+    "Up and Down walk the rows showing, not the whole tree."
+
+  {page, tree.list}
 end
 
 # The navigation page: everything in the navigation group at once, so that the
@@ -130,7 +213,7 @@ def navigation_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget
   sections.add("general", expanded: true).body.add Widgets::Label.new("open")
   sections.add("advanced").body.add Widgets::Label.new("closed until it is asked for")
 
-  pages = Widgets::Pagination.new pages: 24, page: 7
+  pages = Widgets::Pagination.new pages: PAGE_COUNT, page: PAGE_SHOWN
 
   panel = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
     width: Widgets::Layout::Sizing.grow,
@@ -140,7 +223,16 @@ def navigation_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget
     border: Widgets::Border.rounded(title: " navigation ", style: accent)
   panel.add bar, crumbs, tabs, sections, pages
 
-  {panel, bar}
+  page = paged panel,
+    "Bar: termbuf, v0.1, over files, edit, view (F1 to F3); Left, Right, Enter.",
+    "Crumbs: home, projects, termbuf, widgets; home is a link a click follows.",
+    "Tabs: summary, detail (closable); Ctrl+PageUp, Ctrl+PageDown, Enter goes in.",
+    "Sections: general open, advanced shut, one at a time; Enter or Space.",
+    "Pagination: page #{PAGE_SHOWN} of #{PAGE_COUNT}; Left and Right step, Home " \
+    "and End the ends.",
+    "Tab moves the keyboard through the five, in that order."
+
+  {page, bar}
 end
 
 # The overlays page: a button for each of them, and the overlays they put up.
@@ -171,6 +263,12 @@ class OverlayPage < Widgets::Panel
   COOL = TermBuf::Style.new foreground: TermBuf::Color.rgb(90, 190, 120),
     background: TermBuf::Color.rgb(30, 45, 80)
 
+  # How wide the drawer is when it comes out.
+  DRAWER_CELLS = 24
+
+  # What the dialog offers.
+  ANSWERS = %w[Yes No]
+
   def initialize(accent : TermBuf::Style)
     @buttons = ["dialog", "menu", "drawer", "toast"].map { |text| Widgets::Button.new text }
     @answered = Widgets::Label.new "nothing yet"
@@ -187,7 +285,19 @@ class OverlayPage < Widgets::Panel
     @buttons.each { |button| row.add button }
     behind = Widgets::Label.new "and this line dims while one of them is up"
     behind.style = COOL
-    add row, @answered, ground_row, behind
+    add expectations, row, @answered, ground_row, behind
+  end
+
+  # What the four buttons should put up, and what each overlay should do.
+  private def expectations : Widgets::Widget
+    expected "Tab between the four; Enter, Space or a click opens one.",
+      "dialog: leaving, go on, then?, with #{ANSWERS.join " and "}; Escape cancels.",
+      "menu: Open, Save, Revert (greyed), Export (submenu); Escape shuts it.",
+      "drawer: right edge, #{DRAWER_CELLS} cells wide; Escape shuts it.",
+      "toast: bottom right, gone by itself after " \
+      "#{Widgets::Toasts::DEFAULT_TTL.total_seconds.to_i} seconds.",
+      "Dialog and drawer dim this page, keeping its colours; nothing is erased.",
+      "The line under the buttons says what the last overlay answered."
   end
 
   # A row of coloured text where the dialog and the drawer land, so that the
@@ -239,7 +349,7 @@ class OverlayPage < Widgets::Panel
 
   private def confirm(app : Widgets::App) : Nil
     held = @dialog ||= Widgets::Dialog.new "leaving",
-      body: Widgets::Label.new("go on, then?"), actions: %w[Yes No]
+      body: Widgets::Label.new("go on, then?"), actions: ANSWERS
     held.open app
   end
 
@@ -256,7 +366,7 @@ class OverlayPage < Widgets::Panel
     held = @drawer
     return held if held
 
-    made = Widgets::Drawer.new Widgets::Drawer::Edge::Right, size: 24,
+    made = Widgets::Drawer.new Widgets::Drawer::Edge::Right, size: DRAWER_CELLS,
       modal: true, backdrop: true, padding: Widgets::Layout::Padding.all(1),
       border: Widgets::Border.plain(title: " drawer ")
     made.add Widgets::Label.new("escape closes this")
@@ -278,15 +388,27 @@ class DisplayPage < Widgets::Panel
   @clock : Widgets::Clock
   @ago : Widgets::RelativeTime
   @copy : Widgets::CopyButton
+  @rating : Widgets::Rating
 
   URL = "https://sw.kovidgoyal.net/kitty/graphics-protocol/"
 
+  # What the clock is drawn in, which is what the reading should look like.
+  FORMAT = "%H:%M:%S"
+
+  # How wide the picture is, and how many rows deep.
+  SWATCH_COLUMNS = 8
+  SWATCH_ROWS    = 2
+
+  # What is drawn where the terminal draws no pictures.
+  ALT = "[no pictures]"
+
   def initialize(accent : TermBuf::Style)
     @spinner = Widgets::Spinner.new "working"
-    @clock = Widgets::Clock.new "%H:%M:%S"
-    @ago = Widgets::RelativeTime.new Time.local - 90.seconds
+    @clock = Widgets::Clock.new FORMAT
+    @ago = Widgets::RelativeTime.new Time.local - AGO
     @link = Widgets::Hyperlink.new "the graphics protocol", URL
     @copy = Widgets::CopyButton.new "copy the address", -> { URL }
+    @rating = Widgets::Rating.new RATING, max: RATING_MAX, editable: true
 
     super direction: Widgets::Layout::Direction::Column,
       width: Widgets::Layout::Sizing.grow,
@@ -295,7 +417,24 @@ class DisplayPage < Widgets::Panel
       gap: 1,
       border: Widgets::Border.rounded(title: " display ", style: accent)
 
-    add moving_row, stamps_row, icons_row, @link, @copy
+    add expectations, moving_row, stamps_row, icons_row, @link, @copy
+  end
+
+  # What each of the widgets on this page should show, and what should happen
+  # to the ones that can be used.
+  private def expectations : Widgets::Widget
+    expected "Spinner turning by itself; bar #{(PROGRESS * 100).round.to_i}% full, " \
+             "the figure written in it.",
+      "Clock #{FORMAT}, on the second; the date is fixed; the third reading ages " \
+      "from #{AGO.total_seconds.to_i} seconds back.",
+      "Icons: star, dot, folder, each with a plainer spelling in reserve.",
+      "Rating #{RATING} of #{RATING_MAX}: #{RATING.to_i} stars, one dimmed for the " \
+      "half, #{RATING_MAX - RATING.to_i - 1} empty; never a box.",
+      "On the rating Left and Right change it and the digits set it, so 1 to 6 wait.",
+      "Picture: a #{SWATCH_COLUMNS} by #{SWATCH_ROWS} gradient, or #{ALT}.",
+      "Link: Tab reveals the address below; Enter follows, c copies.",
+      "Button: Enter says #{@copy.copied_text} for #{@copy.flash.total_seconds.to_i} " \
+      "seconds, or #{@copy.unavailable_text} where there is none."
   end
 
   # Wires the page to *app*: the link and the button want its clipboard, and
@@ -310,7 +449,7 @@ class DisplayPage < Widgets::Panel
 
   # A spinner and a bar, which are the two ways of saying work is going on.
   private def moving_row : Widgets::Widget
-    bar = Widgets::ProgressBar.new 0.62,
+    bar = Widgets::ProgressBar.new PROGRESS,
       width: Widgets::Layout::Sizing.fixed(24),
       label: Widgets::ProgressBar::Placement::Centre
 
@@ -333,8 +472,8 @@ class DisplayPage < Widgets::Panel
     row.add Widgets::Icon.new("★", fallback: "*"),
       Widgets::Icon.new("●", fallback: "o"),
       Widgets::Icon.new("📁", fallback: "[]"),
-      Widgets::Rating.new(3.5),
-      Widgets::Picture.new(swatch, columns: 8, rows: 2, alt: "[no pictures]")
+      @rating,
+      Widgets::Picture.new(swatch, columns: SWATCH_COLUMNS, rows: SWATCH_ROWS, alt: ALT)
     row
   end
 

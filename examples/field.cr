@@ -10,12 +10,57 @@
 # Nothing here draws at a position. The layout puts the field along the bottom
 # because the root aligns its children to the end of the column, so a resize
 # needs no arithmetic: the tree is laid out again and everything follows.
+#
+# The panel above the field says the same thing on the screen, because an
+# example is a manual test and the person running it should not have to read
+# the source to tell working from broken. It is written out of the constants
+# below, so a value changed here is changed there.
 require "../src/termbuf-widgets"
 
 alias Widgets = TermBuf::Widgets
 
 COLOURS = %w[amber azure carmine cerulean chartreuse cobalt crimson indigo
   magenta ochre saffron scarlet sienna teal ultramarine vermilion]
+
+# The most rows the field grows to before it scrolls inside itself.
+MAX_ROWS = 8
+
+# How many answers are kept on the screen above it.
+KEPT = 12
+
+# What the expectations are drawn in, and what the field's own text is.
+EXPECTED_STYLE = TermBuf::Style::DEFAULT.faint
+
+# What should be on the screen and what each key should do to it.
+def expected : Widgets::Widget
+  lines = [
+    "A bordered field on the bottom row, titled a colour, with a › prompt.",
+    "Empty it shows a faint placeholder; typing grows it to #{MAX_ROWS} rows.",
+    "Enter answers: the line moves into the list above and the field empties.",
+    "Tab completes one of #{COLOURS.size} colour names: #{COLOURS.first}, " \
+    "#{COLOURS[1]}, and so on.",
+    "Up and Down walk the answers already given, matched on what is typed.",
+    "Paste: a notice shows while the bytes arrive and goes when they stop.",
+    "Ctrl+G shows the keys that work right now, in the middle; again hides them.",
+    "Escape, or Ctrl+D on an empty line, leaves.",
+    "Resize: the field keeps the bottom row, the last #{KEPT} answers above it.",
+  ]
+
+  panel = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
+    width: Widgets::Layout::Sizing.grow,
+    padding: Widgets::Layout::Padding.symmetric(horizontal: 1),
+    border: Widgets::Border.plain(title: " expected ", style: EXPECTED_STYLE,
+      title_style: EXPECTED_STYLE)
+
+  lines.each do |line|
+    label = Widgets::Label.new line, wrap: Widgets::Layout::Wrap::Words
+    label.width = Widgets::Layout::Sizing.grow
+    label.style = EXPECTED_STYLE
+    panel.add label
+  end
+
+  panel
+end
 
 # The root of the tree, and the one thing that knows what the application is
 # for: it collects the lines the field hands over and hears when the paste
@@ -61,7 +106,7 @@ TermBuf::Terminal.open do |terminal|
     border: Widgets::Border.rounded(title: " a colour ", style: accent),
     prompt: Widgets::Field::Prompt.new("› ", accent),
     growth: Widgets::Field::Growth::Grow,
-    max_rows: 8,
+    max_rows: MAX_ROWS,
     placeholder: "tab completes, up walks back, Ctrl+G for the keys")
 
   transcript = Widgets::Label.new "", wrap: Widgets::Layout::Wrap::Words
@@ -87,7 +132,7 @@ TermBuf::Terminal.open do |terminal|
     gap: 1,
     align_y: Widgets::Layout::Align::End)
   root.notice = notice
-  root.add transcript, field, help, notice
+  root.add expected, transcript, field, help, notice
 
   keymap = Widgets::App.default_keymap.merge(Widgets::Bindings.build do |map|
     map.bind TermBuf::Key.parse("Ctrl+G"), "show or hide these keys",
@@ -102,7 +147,7 @@ TermBuf::Terminal.open do |terminal|
   terminal.hardware_cursor = terminal.cursor
 
   loop do
-    transcript.text = root.answers.last(12).join '\n'
+    transcript.text = root.answers.last(KEPT).join '\n'
     # Whatever the dispatch chain would answer, which is the field's map and
     # then the application's. The readline keys are not here: those live in the
     # editor's own map, which is keyed on what to do to the text rather than on
