@@ -9,6 +9,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `Rating` no longer draws a half star as `⯪`. U+2BEA is in few terminal fonts, so a 3.5 out of 5
+  came out as three stars, a missing-glyph box and an empty star. Font coverage cannot be probed —
+  the width policy measures cells, not whether the font has the character — so the default set,
+  `Rating::Glyphs::UNICODE`, spells a half star `★` as well and tells it from a whole one by
+  drawing it in `Rating#half_style`: `Rating#filled_style` with a 24 bit foreground halved, or made
+  faint where the colour is the terminal's own or a palette entry. `Rating::Glyphs::HALF_STAR` is
+  the set that spells the half `⯪`, for an application that knows its font carries it. The ASCII
+  set is unchanged.
 - An overlay with a backdrop no longer erases the screen behind it. `Overlay::Backdrop` was a
   screen-sized float that filled every cell it covered, and a drawing surface can be written to and
   not read, so the glyphs underneath were replaced by blanks and only a tint of them was left — on

@@ -57,7 +57,10 @@ to its terminal, and the ones that move without one are advanced by whatever is 
 * `BytesDisplay` — a byte count in IEC or SI units to a given precision, stepping up a unit rather
   than rounding to a whole base
 * `Rating` — a value out of a maximum drawn in stars, read-only by default, editable with the
-  arrow keys, `Home`, `End`, the digit keys and a click
+  arrow keys, `Home`, `End`, the digit keys and a click. A half star is a whole star dimmed
+  rather than `⯪`, which few terminal fonts carry; `Rating::Glyphs::HALF_STAR` asks for that
+  character where the font has it, and an ASCII set is taken where the width policy would draw
+  the stars ragged
 * `Spinner` — a frame of an animation that says work is going on, turned by a timer it arms
   through `App#after` and arms again after every tick. Every frame is drawn in the same number of
   cells, so turning one costs no layout

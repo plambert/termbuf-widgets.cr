@@ -20,9 +20,17 @@ module TermBuf::Widgets
   #
   # That check is the whole of the fallback, and it earns its keep. `★` and `☆`
   # are East Asian Ambiguous, so a terminal configured for CJK text draws them
-  # two cells wide while `⯪` stays at one — a row that would come out ragged.
-  # The policy says so, and the ASCII set is used instead. Setting `#glyphs`
-  # names a set outright and skips the question.
+  # two cells wide — a row that would come out ragged. The policy says so, and
+  # the ASCII set is used instead. Setting `#glyphs` names a set outright and
+  # skips the question.
+  #
+  # `Glyphs::UNICODE` spells a half star `★` as well, and tells one from a
+  # whole star by drawing it in `#half_style` rather than in `#filled_style`.
+  # The character a half star wants is `⯪`, U+2BEA, and most terminal fonts do
+  # not carry it: what the person sees is the missing-glyph box. No policy can
+  # say so, because how wide a cluster is is not whether the font has it, so
+  # the default set asks for nothing rare. `Glyphs::HALF_STAR` is that set, for
+  # an application whose font does carry it.
   #
   # ### Editing
   #
@@ -42,8 +50,14 @@ module TermBuf::Widgets
     # The three characters a rating is drawn with.
     record Glyphs, full : Char, half : Char, empty : Char do
       # Stars, which is what a rating looks like when the terminal can draw
-      # one.
-      UNICODE = new '★', '⯪', '☆'
+      # one. A half star is a whole one drawn in `Rating#half_style`, because
+      # the character for a half star is in no font worth counting on.
+      UNICODE = new '★', '★', '☆'
+
+      # Stars with `⯪` for the half, for a font that carries U+2BEA. Nothing
+      # chooses this set on its own: an application that knows its font names
+      # it through `Rating#glyphs`.
+      HALF_STAR = new '★', '⯪', '☆'
 
       # The fallback, for a policy that would draw the stars ragged.
       ASCII = new '*', '+', '-'
@@ -70,6 +84,13 @@ module TermBuf::Widgets
       end
     end
 
+    # Whether a star is earned, half earned, or not earned at all.
+    enum Fill
+      Full
+      Half
+      Empty
+    end
+
     # Left and Right move by this much.
     STEP = 1.0
 
@@ -91,6 +112,8 @@ module TermBuf::Widgets
     # How far `Left` and `Right` move the value.
     property step : Float64 = STEP
 
+    @half_style : Style? = nil
+
     # How clusters are measured, taken from the tree at every layout.
     getter policy : Unicode::WidthPolicy = Unicode::WidthPolicy::DEFAULT
 
@@ -105,6 +128,7 @@ module TermBuf::Widgets
                    step : Float64 = STEP,
                    filled_style : Style = Style::DEFAULT,
                    empty_style : Style = Style::DEFAULT.faint,
+                   half_style : Style? = nil,
                    style : Style? = nil)
       raise ArgumentError.new "max #{max} is not positive" if max < 1
 
@@ -114,11 +138,41 @@ module TermBuf::Widgets
       @step = step
       @filled_style = filled_style
       @empty_style = empty_style
+      @half_style = half_style
       @style = style
       @value = value.to_f.clamp 0.0, max.to_f
       @width = Layout::Sizing.fit
       @height = Layout::Sizing.fit
       self.editable = editable
+    end
+
+    # What a half star is drawn in, which is what tells a half from a whole
+    # one when both are the same character.
+    #
+    # Unset, which is the default, it is `#filled_style` dimmed: each channel
+    # of a 24 bit foreground halved, and faint where the colour is the
+    # terminal's own or one of its palette entries. Halving an indexed colour
+    # would be guessing at a palette the terminal has not shown anybody.
+    def half_style : Style
+      @half_style || Rating.dimmed(@filled_style)
+    end
+
+    # Sets what a half star is drawn in. `nil` goes back to `#filled_style`
+    # dimmed.
+    def half_style=(style : Style?) : Style?
+      @half_style = style
+    end
+
+    # :nodoc:
+    # *style* with a 24 bit foreground halved, or made faint where it has
+    # none. Not `private`: `crystal docs` cannot parse a private class method
+    # with a return type.
+    def self.dimmed(style : Style) : Style
+      color = style.foreground
+      return style.faint unless color.rgb?
+
+      red, green, blue = color.channels
+      style.fg Color.rgb(red // 2, green // 2, blue // 2)
     end
 
     # How many stars are earned, from zero to `#max`.
@@ -178,15 +232,35 @@ module TermBuf::Widgets
       glyphs_for(policy).width(policy) + @spacing
     end
 
+    # Whether star *index* is earned, half earned, or not earned, counting
+    # from zero.
+    def fill_at(index : Int32) : Fill
+      earned = @value - index
+
+      return Fill::Full if earned >= 1.0
+      return Fill::Half if earned >= 0.5
+
+      Fill::Empty
+    end
+
     # Which of the three characters star *index* gets, counting from zero.
     def glyph_at(index : Int32, policy : Unicode::WidthPolicy = @policy) : Char
       set = glyphs_for policy
-      earned = @value - index
 
-      return set.full if earned >= 1.0
-      return set.half if earned >= 0.5
+      case fill_at index
+      in .full?  then set.full
+      in .half?  then set.half
+      in .empty? then set.empty
+      end
+    end
 
-      set.empty
+    # Which of the three styles star *index* is drawn in, counting from zero.
+    def style_at(index : Int32) : Style
+      case fill_at index
+      in .full?  then @filled_style
+      in .half?  then half_style
+      in .empty? then @empty_style
+      end
     end
 
     # ------------------------------------------------------------- events
@@ -259,13 +333,8 @@ module TermBuf::Widgets
         column = index * step
         break if column >= view.width
 
-        char = glyph_at index, view.policy
-        view.write_char column, 0, char, style_for(char, view.policy)
+        view.write_char column, 0, glyph_at(index, view.policy), style_at(index)
       end
-    end
-
-    private def style_for(char : Char, policy : Unicode::WidthPolicy) : Style
-      char == glyphs_for(policy).empty ? @empty_style : @filled_style
     end
 
     # The keys an editable rating answers.

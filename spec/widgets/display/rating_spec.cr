@@ -55,6 +55,15 @@ Spectator.describe TermBuf::Widgets::Rating do
       expect(Glyphs::UNICODE.width(policy)).to eq 1
       expect(Glyphs::UNICODE.width(cjk)).to eq 2
     end
+
+    it "asks for nothing rarer than a whole star by default" do
+      expect(Glyphs::UNICODE.half).to eq '★'
+    end
+
+    it "never chooses the set spelling a half star ⯪ on its own" do
+      expect(Glyphs.for(policy)).not_to eq Glyphs::HALF_STAR
+      expect(Glyphs.for(cjk)).not_to eq Glyphs::HALF_STAR
+    end
   end
 
   describe "#value=" do
@@ -126,7 +135,36 @@ Spectator.describe TermBuf::Widgets::Rating do
     end
 
     it "draws the stars when the policy can carry them" do
-      expect(Fixtures.render(Rating.new(1.5, max: 3), 10, 1)).to eq ["★⯪☆"]
+      expect(Fixtures.render(Rating.new(1.5, max: 3), 10, 1)).to eq ["★★☆"]
+    end
+
+    it "spells a half star as a whole one, and dims it instead" do
+      painted = Fixtures.painted Rating.new(3.5), 10, 1
+
+      expect(Fixtures.text_of(painted)).to eq ["★★★★☆"]
+      expect(Fixtures.style_at(painted, 2, 0).has?(TermBuf::Attributes::Faint)).to be_false
+      expect(Fixtures.style_at(painted, 3, 0).has?(TermBuf::Attributes::Faint)).to be_true
+    end
+
+    it "halves a 24 bit colour for the half star rather than going faint" do
+      gold = TermBuf::Color.rgb 200, 160, 40
+      painted = Fixtures.painted Rating.new(3.5, filled_style: Style::DEFAULT.fg(gold)), 10, 1
+
+      expect(Fixtures.style_at(painted, 2, 0).foreground).to eq gold
+      expect(Fixtures.style_at(painted, 3, 0).foreground).to eq TermBuf::Color.rgb(100, 80, 20)
+    end
+
+    it "draws the half star in the style it was handed" do
+      stars = Rating.new 3.5, half_style: Style::DEFAULT.italic
+      painted = Fixtures.painted stars, 10, 1
+
+      expect(Fixtures.style_at(painted, 3, 0).has?(TermBuf::Attributes::Italic)).to be_true
+    end
+
+    it "spells the half star ⯪ for a font that was said to carry it" do
+      stars = Rating.new 1.5, max: 3, glyphs: Glyphs::HALF_STAR
+
+      expect(Fixtures.render(stars, 10, 1)).to eq ["★⯪☆"]
     end
 
     it "falls back to ASCII under a policy that would draw them ragged" do
