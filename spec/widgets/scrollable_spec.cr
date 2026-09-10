@@ -175,6 +175,101 @@ Spectator.describe TermBuf::Widgets::Scrollable do
     end
   end
 
+  describe "the keyboard" do
+    # A scroll panel over *count* labels, laid out and drawn once so that the
+    # window has a size to page by.
+    def keyed(count : Int32, columns : Int32 = 6, rows : Int32 = 3) : {Fixtures::TestApp, Scrollable}
+      panel = Scrollable.new
+      count.times { |index| panel.add Label.new("row#{index}") }
+      app = Fixtures::TestApp.new panel, columns, rows
+      app.frame
+
+      {app, panel}
+    end
+
+    it "takes the keyboard when nothing in it can" do
+      panel, _ = stack 5
+
+      expect(panel.focusable?).to be_true
+    end
+
+    it "leaves the keyboard to a control inside it" do
+      panel = Scrollable.new
+      panel.add Label.new("row"), TermBuf::Widgets::Button.new("press me")
+
+      expect(panel.focusable?).to be_false
+    end
+
+    it "counts a control buried under a plain widget" do
+      panel = Scrollable.new
+      holder = Panel.new
+      holder.add TermBuf::Widgets::Button.new("press me")
+      panel.add holder
+
+      expect(panel.focusable?).to be_false
+    end
+
+    it "ignores a control inside a hidden widget, the way the ring does" do
+      panel = Scrollable.new
+      holder = Panel.new
+      holder.add TermBuf::Widgets::Button.new("press me")
+      holder.hidden = true
+      panel.add holder
+
+      expect(panel.focusable?).to be_true
+    end
+
+    it "moves the window a row at a time" do
+      app, panel = keyed 8
+      Fixtures.press app, "Down"
+
+      expect(panel.scroll_y).to eq 1
+    end
+
+    it "moves it back a row" do
+      app, panel = keyed 8
+      panel.scroll_by dy: 4
+      Fixtures.press app, "Up"
+
+      expect(panel.scroll_y).to eq 3
+    end
+
+    it "moves a window at a time on the page keys" do
+      app, panel = keyed 12
+      Fixtures.press app, "PageDown"
+
+      expect(panel.scroll_y).to eq 3
+    end
+
+    it "goes to the ends on Home and End" do
+      app, panel = keyed 8
+      Fixtures.press app, "End"
+      expect(panel.scroll_y).to eq 5
+
+      Fixtures.press app, "Home"
+      expect(panel.scroll_y).to eq 0
+    end
+
+    it "moves a column at a time when it clips sideways" do
+      panel = Scrollable.new direction: Layout::Direction::Row
+      4.times { |index| panel.add Label.new("row#{index}") }
+      app = Fixtures::TestApp.new panel, 6, 3
+      app.frame
+
+      Fixtures.press app, "Right"
+      expect(panel.scroll_x).to eq 1
+    end
+
+    it "leaves Left and Right alone on an axis it does not clip" do
+      app, panel = keyed 8
+      taken = app.router.dispatch TermBuf::Events::Key.new(TermBuf::Key.parse("Right").first,
+        Bytes.empty)
+
+      expect(taken).to be_false
+      expect(panel.scroll_x).to eq 0
+    end
+  end
+
   describe "what it tells the surface" do
     it "leaves a scroll hint when the window moved" do
       panel, _ = stack 8

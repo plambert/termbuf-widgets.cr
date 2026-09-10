@@ -25,6 +25,16 @@ module TermBuf::Widgets
     # shows through wherever they are blank. Zero and above is over the text.
     property image_z : Int32 = -1
 
+    # What the border is drawn in while the keyboard is inside the panel, or
+    # `nil` for one that looks the same either way.
+    #
+    # A pane is a box around something else, and the something else is what the
+    # keyboard lands on, so the pane cannot ask `Widget#focused?` and get a
+    # useful answer. It asks `Widget#focus_within?` instead, which is true
+    # while the keyboard is on the panel or on anything under it. Only the box
+    # changes: the title goes on saying what the pane is.
+    property focused_border_style : Style? = nil
+
     def initialize(direction : Layout::Direction = Layout::Direction::Column,
                    width : Layout::Sizing = Layout::Sizing.fit,
                    height : Layout::Sizing = Layout::Sizing.fit,
@@ -47,6 +57,21 @@ module TermBuf::Widgets
       @align_y = align_y
       @border = border
       @style = style
+    end
+
+    # The box drawn around the panel, in `#focused_border_style` while the
+    # keyboard is inside it.
+    #
+    # The renderer reads this rather than the instance variable, and the layout
+    # reads the instance variable rather than this, which is what keeps a lit
+    # border from being a geometry change: a box is one cell per side whatever
+    # colour it is.
+    def border : Border?
+      box = @border
+      lit = @focused_border_style
+      return box if box.nil? || lit.nil? || !focus_within?
+
+      box.with_style lit
     end
 
     # Puts the panel's picture across the box it draws in.

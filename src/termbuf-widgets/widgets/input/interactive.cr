@@ -29,44 +29,18 @@ module TermBuf::Widgets
   # What a widget that answers the keyboard and the pointer needs and `Widget`
   # does not give it.
   #
-  # Two things live here. Knowing whether the keyboard is on this widget, which
-  # a button needs in order to draw itself differently, and turning a press and
-  # a release into one click, which every clickable widget needs and none
-  # should write twice.
+  # Two things live here. Taking the keyboard, which a control does when it is
+  # clicked, and turning a press and a release into one click, which every
+  # clickable widget needs and none should write twice. Knowing whether the
+  # keyboard is already here is `Widget#focused?`, which every widget has:
+  # a pane wants the answer as much as a button does.
   module Interactive
     # Whether the pointer went down on this widget and has not come up again.
     getter? held : Bool = false
 
-    # Whether the keyboard is on this widget.
-    #
-    # A widget has no link to the focus stack, so this finds the router the way
-    # `Widget#emit` finds its mailbox: by walking up to whatever the root
-    # carries. A tree drawn without a router — which is what a layout spec
-    # does — has no focus at all, and everything in it answers `false`.
-    def focused? : Bool
-      router = routed_by
-      return false unless router
-
-      held = router.focus.current
-      !held.nil? && held.same?(self)
-    end
-
     # Puts the keyboard on this widget, answering whether it went.
     def take_focus(context : Context) : Bool
       context.focus.focus self
-    end
-
-    # The router dispatching into this widget's tree, or `nil` outside one.
-    def routed_by : Router?
-      node : Widget? = self
-      while node
-        box = node.mailbox
-        return box if box.is_a? Router
-
-        node = node.parent
-      end
-
-      nil
     end
 
     # Turns a press and a release inside this widget into one click.

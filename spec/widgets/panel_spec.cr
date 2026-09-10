@@ -150,4 +150,30 @@ Spectator.describe TermBuf::Widgets::Panel do
       expect(Fixtures.render(Panel.new(image: image), 6, 2)).to eq ["", ""]
     end
   end
+
+  describe "#focused_border_style" do
+    alias Border = TermBuf::Widgets::Border
+
+    it "keeps the border it was given while the keyboard is elsewhere" do
+      panel = Panel.new border: Border.plain(title: " box ")
+      panel.focused_border_style = TermBuf::Style::DEFAULT.bold
+
+      expect(panel.border.try &.style).to eq TermBuf::Style::DEFAULT
+    end
+
+    it "leaves the title alone when it lights the box" do
+      lit = Border.plain(title: " box ").with_style TermBuf::Style::DEFAULT.bold
+
+      expect(lit.title).to eq " box "
+      expect(lit.style).to eq TermBuf::Style::DEFAULT.bold
+    end
+
+    it "changes no geometry, since a box is a cell per side either way" do
+      panel = Panel.new border: Border.plain
+      before = panel.inset
+      panel.focused_border_style = TermBuf::Style::DEFAULT.bold
+
+      expect(panel.inset).to eq before
+    end
+  end
 end

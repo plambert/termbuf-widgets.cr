@@ -13,6 +13,11 @@ module TermBuf::Widgets
   #     rows.each { |row| panel.add row }
   #     panel.scroll_to selected
   #
+  # A window over plain content takes the keyboard, because the keyboard is
+  # the only thing that could scroll it. A window over controls does not: the
+  # controls take it, and moving between them scrolls the window to wherever
+  # the next one is. See `#focusable?`.
+  #
   # A vertical scroll is announced to the surface as well as being drawn, so
   # the painter can reach for the terminal's own scrolling region instead of
   # rewriting every row. See `#draw`.
@@ -48,6 +53,87 @@ module TermBuf::Widgets
       # has to do.
       @clip_x = clip_x.nil? ? direction.row? : clip_x
       @clip_y = clip_y.nil? ? direction.column? : clip_y
+      self.keymap = Scrollable.scrolling self
+    end
+
+    # The keys that move the window, for the axes *panel* actually clips.
+    #
+    # A panel is given its own copy, so rebinding one leaves the rest alone.
+    # Only the clipped axes are bound, because a binding that matches claims
+    # the key: a column that never scrolls sideways would otherwise swallow
+    # `Left` and `Right` and do nothing with them.
+    #
+    # `Scrollable#initialize` calls this once the clipping is settled. A panel
+    # whose `Widget#clip_x?` or `Widget#clip_y?` is changed afterwards wants
+    # `panel.keymap = Scrollable.scrolling panel` to go with it.
+    def self.scrolling(panel : Scrollable) : Bindings
+      Bindings.build do |map|
+        if panel.clip_y?
+          map.bind Key.parse("Up"), "a row back",
+            ->(_context : Context) { panel.scroll_by dy: -1 }
+          map.bind Key.parse("Down"), "a row on",
+            ->(_context : Context) { panel.scroll_by dy: 1 }
+          map.bind Key.parse("PageUp"), "a window back",
+            ->(_context : Context) { panel.scroll_by dy: -panel.page }
+          map.bind Key.parse("PageDown"), "a window on",
+            ->(_context : Context) { panel.scroll_by dy: panel.page }
+        end
+
+        if panel.clip_x?
+          map.bind Key.parse("Left"), "a column back",
+            ->(_context : Context) { panel.scroll_by dx: -1 }
+          map.bind Key.parse("Right"), "a column on",
+            ->(_context : Context) { panel.scroll_by dx: 1 }
+        end
+
+        map.bind Key.parse("Home"), "the start of the content",
+          ->(_context : Context) { panel.scroll_to_start }
+        map.bind Key.parse("End"), "the end of it",
+          ->(_context : Context) { panel.scroll_to_end }
+      end
+    end
+
+    # Whether focus lands here, which it does for a window over content
+    # nothing inside can be focused on.
+    #
+    # A scroll panel holding labels is scrolled by the keyboard and by nothing
+    # else, so it takes it. One holding controls is scrolled by moving between
+    # them — `#scroll_to` brings the next one into view — so it stays out of
+    # the tab order rather than making the person tab past the pane to reach
+    # what is in it.
+    def focusable? : Bool
+      !children.any? { |child| focusable_under? child }
+    end
+
+    # Whether *widget* or anything under it can take the keyboard.
+    #
+    # The same walk `Focus::Scope` makes: a hidden widget and everything under
+    # it are out, and a float is in, since a float keeps its place in the tab
+    # order of whatever put it up.
+    private def focusable_under?(widget : Widget) : Bool
+      return false if widget.hidden?
+      return true if widget.focusable?
+
+      widget.children.any? { |child| focusable_under? child }
+    end
+
+    # How many rows a page key moves, which is a window's worth.
+    def page : Int32
+      Math.max viewport_size[1], 1
+    end
+
+    # Puts the window back at the start of the content, on whichever axes it
+    # clips.
+    def scroll_to_start : Nil
+      self.scroll_x = 0 if clip_x?
+      self.scroll_y = 0 if clip_y?
+    end
+
+    # Puts it at the end of the content.
+    def scroll_to_end : Nil
+      limit = max_scroll
+      self.scroll_x = limit[0] if clip_x?
+      self.scroll_y = limit[1] if clip_y?
     end
 
     # Cells the content comes to, which is what a scrollbar divides the

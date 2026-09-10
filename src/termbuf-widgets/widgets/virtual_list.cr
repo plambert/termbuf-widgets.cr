@@ -6,9 +6,16 @@ module TermBuf::Widgets
   # A window over rows, which draws the ones that are showing and no others.
   #
   #     list = VirtualList.new Rows.of(names)
-  #     list.on_draw = ->(view : View, index : Int32, name : String, chosen : Bool) do
-  #       view.write 0, 0, name, chosen ? Style::DEFAULT.reverse : Style::DEFAULT
+  #     list.on_draw = ->(view : View, index : Int32, name : String,
+  #                       chosen : Bool, focused : Bool) do
+  #       lit = chosen && focused
+  #       view.write 0, 0, name, lit ? Style::DEFAULT.reverse : Style::DEFAULT
   #     end
+  #
+  # The block is told which row is chosen and, separately, whether the list has
+  # the keyboard, because those are two different things to draw. A list that
+  # has lost focus still knows where its selection is, and a highlight left lit
+  # says the arrows will move it when they will not.
   #
   # What makes it virtual is that it holds no widget per row. It asks its
   # `Rows` how many there are, and then asks for the rows in the window and
@@ -41,8 +48,10 @@ module TermBuf::Widgets
     # What draws one row, or `nil` for the default, which writes what the row
     # answers to `#to_s` and reverses it when it is the chosen one.
     #
-    # The view is cut to that row: one cell tall, as wide as the list.
-    property on_draw : Proc(View, Int32, T, Bool, Nil)? = nil
+    # Called with the view, the row's index, the row, whether it is the chosen
+    # one and whether the list is focused. The view is cut to that row: one
+    # cell tall, as wide as the list.
+    property on_draw : Proc(View, Int32, T, Bool, Bool, Nil)? = nil
 
     # The height the selection was last brought into view at, so that a window
     # which changed size can bring it back without fighting a scroll somebody
@@ -203,16 +212,21 @@ module TermBuf::Widgets
         scroll_to @selected
       end
 
+      # Asked once a frame rather than once a row: the answer walks up to the
+      # router, and it is the same answer for every row in the window.
+      lit = focused?
+
       first = visible_range.begin
       each_visible do |index, item|
         row = view.view Rect.new(0, index - first, view.width, 1)
-        draw_row row, index, item, index == @selected
+        draw_row row, index, item, index == @selected, lit
       end
     end
 
-    private def draw_row(view : View, index : Int32, item : T, chosen : Bool) : Nil
+    private def draw_row(view : View, index : Int32, item : T, chosen : Bool,
+                         lit : Bool) : Nil
       hook = @on_draw
-      return hook.call view, index, item, chosen if hook
+      return hook.call view, index, item, chosen, lit if hook
 
       view.write 0, 0, item.to_s, chosen ? Style::DEFAULT.reverse : Style::DEFAULT
     end

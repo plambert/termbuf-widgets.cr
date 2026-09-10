@@ -62,7 +62,7 @@ Spectator.describe TermBuf::Widgets::SelectionList do
 
     it "draws each row through the block it was given" do
       list = SelectionList.new options
-      list.on_draw = ->(view : TermBuf::View, _index : Int32, option : Option(String), _chosen : Bool) do
+      list.on_draw = ->(view : TermBuf::View, _index : Int32, option : Option(String), _chosen : Bool, _focused : Bool) do
         view.write 0, 0, option.label.upcase
       end
 

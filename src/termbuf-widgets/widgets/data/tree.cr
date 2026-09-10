@@ -112,7 +112,7 @@ module TermBuf::Widgets
 
     # What draws one row, or `nil` for the default, which writes the indent,
     # the expander and the label.
-    property on_draw : Proc(View, Int32, T, Bool, Nil)? = nil
+    property on_draw : Proc(View, Int32, T, Bool, Bool, Nil)? = nil
 
     # The nodes that are open.
     @expanded = Set(T).new
@@ -143,8 +143,8 @@ module TermBuf::Widgets
 
       @list = VirtualList(T).new Rows(T).from(-> { flat.size },
         ->(index : Int32) { flat[index].value })
-      @list.on_draw = ->(view : View, index : Int32, node : T, chosen : Bool) do
-        paint view, index, node, chosen
+      @list.on_draw = ->(view : View, index : Int32, node : T, chosen : Bool, focused : Bool) do
+        paint view, index, node, chosen, focused
       end
 
       add @list
@@ -403,9 +403,10 @@ module TermBuf::Widgets
 
     # Draws one row of the list, which is what the list was handed when it was
     # built.
-    private def paint(view : View, index : Int32, node : T, chosen : Bool) : Nil
+    private def paint(view : View, index : Int32, node : T, chosen : Bool,
+                      focused : Bool) : Nil
       hook = @on_draw
-      return hook.call view, index, node, chosen if hook
+      return hook.call view, index, node, chosen, focused if hook
 
       row = @flat[index]?
       return unless row

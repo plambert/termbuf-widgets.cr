@@ -392,6 +392,40 @@ module TermBuf::Widgets
       false
     end
 
+    # Whether the keyboard is on this widget.
+    #
+    # A widget has no link to the focus stack, so this finds the router the way
+    # `#emit` finds its mailbox: by walking up to whatever the root carries. A
+    # tree drawn without a router — which is what a layout spec does — has no
+    # focus at all, and everything in it answers `false`.
+    def focused? : Bool
+      held = routed_by.try &.focus.current
+      !held.nil? && held.same?(self)
+    end
+
+    # Whether the keyboard is on this widget or on anything under it.
+    #
+    # What a pane asks in order to light its own border for the control inside
+    # it: the border belongs to the pane and the keyboard is on the list, and
+    # neither of them alone can draw the answer.
+    def focus_within? : Bool
+      held = routed_by.try &.focus.current
+      !held.nil? && held.under?(self)
+    end
+
+    # The router dispatching into this widget's tree, or `nil` outside one.
+    def routed_by : Router?
+      node : Widget? = self
+      while node
+        box = node.mailbox
+        return box if box.is_a? Router
+
+        node = node.parent
+      end
+
+      nil
+    end
+
     # What this widget does with an event no binding in the chain claimed.
     #
     # Call `Context#consume` to stop the event here; answering without

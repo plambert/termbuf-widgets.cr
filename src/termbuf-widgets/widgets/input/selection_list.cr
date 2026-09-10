@@ -164,7 +164,7 @@ module TermBuf::Widgets
 
     # What draws one row, or `nil` for the default, which writes the mark and
     # the label.
-    property on_draw : Proc(View, Int32, Option(T), Bool, Nil)? = nil
+    property on_draw : Proc(View, Int32, Option(T), Bool, Bool, Nil)? = nil
 
     # The prefix the labels are held to, or an empty string for none.
     getter filter : String = ""
@@ -209,8 +209,8 @@ module TermBuf::Widgets
 
       @list = VirtualList(Option(T)).new Rows(Option(T)).from(-> { shown.size },
         ->(index : Int32) { shown[index] })
-      @list.on_draw = ->(view : View, index : Int32, option : Option(T), chosen : Bool) do
-        paint view, index, option, chosen
+      @list.on_draw = ->(view : View, index : Int32, option : Option(T), chosen : Bool, focused : Bool) do
+        paint view, index, option, chosen, focused
       end
 
       add @notice, @list
@@ -562,9 +562,10 @@ module TermBuf::Widgets
 
     # Draws one row of the window, which is what the window was handed when it
     # was built.
-    private def paint(view : View, index : Int32, option : Option(T), chosen : Bool) : Nil
+    private def paint(view : View, index : Int32, option : Option(T),
+                      chosen : Bool, focused : Bool) : Nil
       hook = @on_draw
-      return hook.call view, index, option, chosen if hook
+      return hook.call view, index, option, chosen, focused if hook
 
       source = @indices[index]?
       picked = !source.nil? && @chosen.includes?(source)

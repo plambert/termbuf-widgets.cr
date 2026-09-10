@@ -131,7 +131,7 @@ module TermBuf::Widgets
 
       @width = Layout::Sizing.fit
       @height = Layout::Sizing.fit
-      @list.on_draw = ->(view : View, _index : Int32, item : Item, chosen : Bool) do
+      @list.on_draw = ->(view : View, _index : Int32, item : Item, chosen : Bool, _focused : Bool) do
         draw_item view, item, chosen
       end
       @list.keymap = moves

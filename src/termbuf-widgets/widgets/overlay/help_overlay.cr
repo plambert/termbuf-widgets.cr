@@ -140,7 +140,7 @@ module TermBuf::Widgets
     # :inherit:
     protected def prepare(app : App) : Nil
       refresh app
-      @list.on_draw = ->(view : View, _index : Int32, row : Row, chosen : Bool) do
+      @list.on_draw = ->(view : View, _index : Int32, row : Row, chosen : Bool, _focused : Bool) do
         draw_row view, row, chosen
       end
     end

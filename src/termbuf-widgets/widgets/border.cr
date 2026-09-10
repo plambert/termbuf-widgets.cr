@@ -50,6 +50,14 @@ module TermBuf::Widgets
       Border.new @glyphs, @style, title, @title_style
     end
 
+    # A copy of the box drawn in a different style, the title left as it was.
+    #
+    # What `Panel#focused_border_style` is applied through: the box lights up
+    # and the title goes on saying what the pane is.
+    def with_style(style : Style) : Border
+      Border.new @glyphs, style, @title, @title_style
+    end
+
     # The area inside the box. Empty when *rect* has no room for one.
     def self.inset(rect : Rect) : Rect
       return Rect.new rect.x, rect.y, 0, 0 if rect.width < 3 || rect.height < 3

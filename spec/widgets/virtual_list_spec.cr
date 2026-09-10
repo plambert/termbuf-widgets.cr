@@ -77,13 +77,32 @@ Spectator.describe TermBuf::Widgets::VirtualList do
 
     it "draws each row through the block it was given" do
       made = list 4
-      made.on_draw = ->(view : TermBuf::View, _index : Int32, item : String, chosen : Bool) do
+      made.on_draw = ->(view : TermBuf::View, _index : Int32, item : String, chosen : Bool, _focused : Bool) do
         view.write 0, 0, "#{chosen ? '>' : ' '}#{item}"
         nil
       end
       made.select 1
 
       expect(Fixtures.render(made, 6, 3)).to eq [" r0", ">r1", " r2"]
+    end
+
+    it "tells the block whether it has the keyboard" do
+      made = list 3
+      seen = [] of Bool
+      made.on_draw = ->(view : TermBuf::View, _index : Int32, item : String, _chosen : Bool, focused : Bool) do
+        seen << focused
+        view.write 0, 0, item
+        nil
+      end
+
+      Fixtures.render made, 6, 1
+      expect(seen).to eq [false]
+
+      app = Fixtures::TestApp.new made, 6, 1
+      seen.clear
+      app.frame
+
+      expect(seen).to eq [true]
     end
 
     it "reverses the chosen row by default" do
