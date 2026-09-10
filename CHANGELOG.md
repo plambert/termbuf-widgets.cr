@@ -7,6 +7,18 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- An overlay with a backdrop no longer erases the screen behind it. `Overlay::Backdrop` was a
+  screen-sized float that filled every cell it covered, and a drawing surface can be written to and
+  not read, so the glyphs underneath were replaced by blanks and only a tint of them was left — on
+  a black background, nothing at all. There is no backdrop widget any more: the renderer asks each
+  root for `Widget#backdrop_wash` and draws every root below a backdrop-bearing overlay through it,
+  so the widgets down there draw their own glyphs and the blend only settles the style. An overlay
+  above another — a toast over a dialog — is not dimmed by it. `Overlay.dim` halves each channel of
+  a 24 bit colour and draws a cell with no colour of its own faint, so the dimming shows on a
+  coloured screen and on a black one.
+
 ### Changed
 
 - `Layout::Sizing.percent` is a share of what is left rather than of the whole content box: the
@@ -42,9 +54,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   float put up with `#open` and taken down with `#close`; a modal one pushes a focus scope with
   itself as the root, and every one of them carries a zero-sized `Overlay::Catcher` that answers
   the points it did not, so a click cannot reach what is behind it.
-- `Overlay::Backdrop`, a screen-sized float that dims what is under an overlay through a
-  `TermBuf::Blend`. It paints over what is behind it rather than tinting it, because a drawing
-  surface can be written to and not read.
+- `Overlay#backdrop_wash` and `Widget#backdrop_wash` under it, which is how an overlay dims what is
+  behind it: the renderer draws each root through the washes of the roots painted over it.
+  `Overlay.dim` is the default one, and `Overlay#backdrop_blend` takes another.
 - `Widget#wash`, a `TermBuf::Blend` the renderer hands to the view a widget and everything under it
   draws through, so it settles the ground the renderer fills as well as anything drawn on it.
 - `App#after(span, &block)` and `App#cancel(nonce)`, with the `App#after=` and `App#cancel=` procs

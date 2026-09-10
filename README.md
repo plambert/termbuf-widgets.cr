@@ -273,9 +273,17 @@ a plain `Enter`. `TextArea.default_accept_keys` is therefore both `Ctrl+Enter` a
 
 The widgets drawn over the screen rather than beside it live under
 `src/termbuf-widgets/widgets/overlay/`. Each of them is a float that is put up with `#open` and
-taken down with `#close`, and each takes the same three things with it: itself, a `Catcher` one z
-below that answers every point the overlay did not so a click cannot reach what is behind it, and
-an optional `Backdrop` one below that which dims what is there.
+taken down with `#close`, and each takes one more float with it: a `Catcher` one z below that
+answers every point the overlay did not, so a click cannot reach what is behind it.
+
+An overlay asked for a backdrop dims what is behind it without drawing anything there. Before a
+frame is painted the renderer asks every root for its `Overlay#backdrop_wash` and draws each root
+through the washes of the roots above it, so the widgets down there put their own glyphs on the
+screen as they always did and the blend only settles the style each cell comes out with. A toast
+opened over a dialog is above it and stays at full colour. `Overlay.dim` is what does the dimming
+unless an overlay names another blend in `#backdrop_blend`: a 24 bit colour has each channel
+halved, and a cell with no colour of its own is drawn faint instead, since there is nothing there
+to halve and an indexed colour is the terminal's to interpret.
 
 ```crystal
 dialog = TermBuf::Widgets::Dialog.new "Unsaved changes",

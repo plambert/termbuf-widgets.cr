@@ -160,6 +160,17 @@ class OverlayPage < Widgets::Panel
   @drawer : Widgets::Drawer? = nil
   @answered : Widgets::Label
 
+  # The page's own ground, which is what the dialog and the drawer dim. A
+  # terminal on a black background shows nothing of a backdrop that halves
+  # colours the page never named.
+  GROUND = TermBuf::Style.new background: TermBuf::Color.rgb(30, 45, 80)
+
+  # The colours of the text behind the overlays, chosen to be worth halving.
+  WARM = TermBuf::Style.new foreground: TermBuf::Color.rgb(200, 120, 60),
+    background: TermBuf::Color.rgb(30, 45, 80)
+  COOL = TermBuf::Style.new foreground: TermBuf::Color.rgb(90, 190, 120),
+    background: TermBuf::Color.rgb(30, 45, 80)
+
   def initialize(accent : TermBuf::Style)
     @buttons = ["dialog", "menu", "drawer", "toast"].map { |text| Widgets::Button.new text }
     @answered = Widgets::Label.new "nothing yet"
@@ -169,11 +180,26 @@ class OverlayPage < Widgets::Panel
       height: Widgets::Layout::Sizing.grow,
       padding: Widgets::Layout::Padding.all(1),
       gap: 1,
+      style: GROUND,
       border: Widgets::Border.rounded(title: " overlays ", style: accent)
 
     row = Widgets::Panel.new direction: Widgets::Layout::Direction::Row, gap: 2
     @buttons.each { |button| row.add button }
-    add row, @answered
+    behind = Widgets::Label.new "and this line dims while one of them is up"
+    behind.style = COOL
+    add row, @answered, ground_row, behind
+  end
+
+  # A row of coloured text where the dialog and the drawer land, so that the
+  # dimming has something to dim.
+  private def ground_row : Widgets::Widget
+    row = Widgets::Panel.new direction: Widgets::Layout::Direction::Row, gap: 2
+    %w[behind the overlay].each do |word|
+      label = Widgets::Label.new word
+      label.style = WARM
+      row.add label
+    end
+    row
   end
 
   # Wires the page to *app*, which is what the overlays are opened on and where
