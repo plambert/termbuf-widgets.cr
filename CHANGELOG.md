@@ -9,6 +9,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- `Tab` moves between the panes of the panes page in `examples/widgets.cr`, and the screen says
+  which one it landed on. Two things were wrong. `Scrollable` was not focusable, so the page's ring
+  held only the `VirtualList` and `Tab` cycled from it to itself; a scroll panel over plain content
+  is now focusable, with `Up` and `Down` moving a row, `PageUp` and `PageDown` a window, `Home` and
+  `End` the ends and `Left` and `Right` a column on a panel that clips sideways. Only the axes it
+  clips are bound, since a binding that matches claims the key. A panel with a focusable widget
+  under it stays out of the ring as before and lets that widget take the keyboard. And nothing was
+  drawn differently for the change: `VirtualList#on_draw` is now told whether the list has the
+  keyboard as well as which row is chosen, and `Panel#focused_border_style` draws a pane's border
+  in another style while the keyboard is inside it, so the example marks the chosen row `▸` always
+  and reverses it only while the list has the keyboard.
 - `Rating` no longer draws a half star as `⯪`. U+2BEA is in few terminal fonts, so a 3.5 out of 5
   came out as three stars, a missing-glyph box and an empty star. Font coverage cannot be probed —
   the width policy measures cells, not whether the font has the character — so the default set,
@@ -29,6 +40,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `VirtualList#on_draw`, `Tree#on_draw` and `SelectionList#on_draw` take one more argument: whether
+  the list has the keyboard, after the flag saying whether the row is the chosen one. A block
+  written against the old four is a compile error, and takes a fifth parameter to fix. The default
+  drawing is unchanged.
+- `Widget#focused?` and `Widget#routed_by` moved down from `Interactive` to `Widget`, and
+  `Widget#focus_within?` joins them. Knowing where the keyboard is is not something only a control
+  needs: a pane wants it in order to draw its border. `Interactive` still carries `#take_focus`,
+  `#held?` and `#clicked`, and nothing that included it has to change.
 - `Layout::Sizing.percent` is a share of what is left rather than of the whole content box: the
   parent's box, less the gaps between its children, less every sibling already settled at a size,
   meaning the `Fixed` ones and the `Fit` ones. `Grow` siblings still take what the percents leave.
@@ -39,6 +58,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `Panel#focused_border_style`, the style a pane's border is drawn in while the keyboard is on it
+  or on anything under it, and `Border#with_style`, the copy of a box in another style with its
+  title left alone. A lit border is not a geometry change: the layout reads the border the panel
+  was given and the renderer reads the one it answers with, and a box is a cell per side either
+  way.
+- `Scrollable#page`, `#scroll_to_start` and `#scroll_to_end`, which are what its own keys move by,
+  and `Scrollable.scrolling`, which builds them for a panel whose clipping has changed since it was
+  made.
 - Six more display widgets, under `src/termbuf-widgets/widgets/display/`: `Spinner`, `Clock`,
   `RelativeTime`, `DateDisplay`, `Icon`, `Picture`, `Hyperlink` and `CopyButton`. The glyph ones
   measure their preferred spelling under the tree's width policy and take a plainer one where it

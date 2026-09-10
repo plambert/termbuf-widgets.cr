@@ -38,6 +38,37 @@ Each of the four is held inside its own `min` and `max`.
 
 ## Widgets
 
+### Panes
+
+The two windows onto more than fits, and the bar that says how far into it you are. Both are a
+`Scrolls`, which is all a `Scrollbar` asks of the thing it is attached to: how much there is, how
+much is showing, and how far in the window sits.
+
+* `Scrollable` — a panel that clips rather than compressing its children, so they keep the size
+  they asked for and the edges do the cutting. It takes the keyboard when nothing inside it can,
+  which is what a window over plain content wants: `Up` and `Down` move a row, `PageUp` and
+  `PageDown` a window, `Home` and `End` the ends, and `Left` and `Right` a column on a panel that
+  clips sideways. A panel holding controls stays out of the tab order instead and lets them take
+  the keyboard, since moving between them scrolls the window to wherever the next one is. Only the
+  axes it clips are bound, so a column never swallows `Left`
+* `VirtualList` — a window over a `Rows` source that holds no widget per row: it asks how many
+  there are and then for the ones in the window, so twenty rows of a hundred thousand cost what
+  twenty rows of twenty do. `#on_draw` draws one row, and is told the row, whether it is the chosen
+  one and whether the list has the keyboard, so a highlight can say the arrows will move it rather
+  than staying lit on a list nothing is pointing at
+* `Panel#focused_border_style` — what a pane's border is drawn in while the keyboard is on it or on
+  anything under it. The control is what takes the keyboard and the pane is what is drawn around
+  it, so the pane asks `Widget#focus_within?` rather than `Widget#focused?`
+
+```crystal
+notes = TermBuf::Widgets::Scrollable.new
+lines.each { |line| notes.add TermBuf::Widgets::Label.new(line) }
+
+pane = TermBuf::Widgets::Panel.new border: TermBuf::Widgets::Border.plain(title: " notes ")
+pane.focused_border_style = accent
+pane.add notes
+```
+
 ### Display
 
 Widgets that show a number, a state or a time, and mostly take no input. Each says how wide it wants

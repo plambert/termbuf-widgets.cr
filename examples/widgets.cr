@@ -59,6 +59,10 @@ PROGRESS = 0.62
 # eye, plain enough to read.
 EXPECTED_STYLE = TermBuf::Style::DEFAULT.faint
 
+# What a pane's border is drawn in while the keyboard is somewhere else. The
+# focused one takes the accent colour, so the two have to differ.
+PANE_STYLE = TermBuf::Style::DEFAULT.faint
+
 # The panel at the top of a page: one line per thing demonstrated, saying what
 # it should show and what should happen when it is used.
 def expected(*lines : String) : Widgets::Widget
@@ -93,27 +97,33 @@ def panes_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
   rows = Widgets::Rows.from -> { ROWS }, ->(index : Int32) { "row #{index}" }
 
   list = Widgets::VirtualList.new rows
-  list.on_draw = ->(view : TermBuf::View, _index : Int32, text : String, chosen : Bool) do
+  # The mark says which row is chosen whatever has the keyboard; the reverse
+  # video says the arrows will move it, so it is drawn only while the list has
+  # the keyboard.
+  list.on_draw = ->(view : TermBuf::View, _index : Int32, text : String, chosen : Bool, focused : Bool) do
     view.write 0, 0, chosen ? "▸ #{text}" : "  #{text}",
-      chosen ? TermBuf::Style::DEFAULT.reverse : TermBuf::Style::DEFAULT
+      chosen && focused ? TermBuf::Style::DEFAULT.reverse : TermBuf::Style::DEFAULT
     nil
   end
 
   left = Widgets::Panel.new direction: Widgets::Layout::Direction::Row,
     width: Widgets::Layout::Sizing.grow,
     height: Widgets::Layout::Sizing.grow,
-    border: Widgets::Border.rounded(title: " rows ", style: accent)
+    border: Widgets::Border.rounded(title: " rows ", style: PANE_STYLE)
+  left.focused_border_style = accent
   left.add list, Widgets::Scrollbar.new(list)
 
   # A scroll panel is a window over real widgets, which is the other half of
-  # the story: one row per thing, clipped rather than compressed.
+  # the story: one row per thing, clipped rather than compressed. Nothing in it
+  # can take the keyboard, so the panel takes it itself and the arrows scroll.
   notes = Widgets::Scrollable.new
   NOTES.times { |index| notes.add Widgets::Label.new("note #{index}") }
 
   right = Widgets::Panel.new direction: Widgets::Layout::Direction::Row,
     width: Widgets::Layout::Sizing.grow,
     height: Widgets::Layout::Sizing.grow,
-    border: Widgets::Border.plain(title: " notes ")
+    border: Widgets::Border.plain(title: " notes ", style: PANE_STYLE)
+  right.focused_border_style = accent
   right.add notes, Widgets::Scrollbar.new(notes)
 
   split = Widgets::Split.new left, right,
@@ -124,8 +134,11 @@ def panes_page(accent : TermBuf::Style) : {Widgets::Widget, Widgets::Widget}
     "Drag the rule, which starts #{SPLIT_AT} cells in: both panes resize, and " \
     "neither is let below #{SPLIT_MINIMUM} cells.",
     "The wheel over a pane scrolls that one, and its scrollbar follows.",
-    "Tab moves between list and notes; Up, Down, PageUp, PageDown, Home and End " \
-    "move the chosen row."
+    "Tab moves between list and notes, and the pane with the keyboard is the " \
+    "one whose border is in the accent colour.",
+    "On the list, Up, Down, PageUp, PageDown, Home and End move the chosen " \
+    "row, which is in reverse video only while the list has the keyboard.",
+    "On the notes the same keys scroll the pane, a row or a window at a time."
 
   {page, list}
 end
