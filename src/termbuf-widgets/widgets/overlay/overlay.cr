@@ -16,17 +16,21 @@ module TermBuf::Widgets
   # it a second time costs nothing and a message it emits on the way down still
   # has a parent to reach.
   #
-  # Three floats make one overlay:
+  # Two floats make one overlay:
   #
   # * the overlay itself, at `#z`;
   # * a `Catcher` one below it, which is nowhere on the screen and everywhere
   #   in the hit test, so a click outside a modal overlay reaches the overlay
-  #   rather than whatever it is covering;
-  # * a `Backdrop` one below that, for an overlay that wants what is behind it
-  #   dimmed.
+  #   rather than whatever it is covering.
   #
-  # Both are children of the overlay, so they come and go with it and appear in
-  # the chain an event walks up.
+  # The catcher is a child of the overlay, so it comes and goes with it and
+  # appears in the chain an event walks up.
+  #
+  # An overlay that asks for a backdrop dims what is behind it without drawing
+  # anything at all. The renderer draws every root below such an overlay
+  # through `#backdrop_wash`, so the glyphs are still put there by the widgets
+  # that own them and the blend only settles the style each cell comes out
+  # with. See `Overlay.dim`.
   abstract class Overlay < Panel
     # Where each kind of overlay sits, so that a menu opens over a drawer, a
     # dialog over both, and a toast over everything.
@@ -78,32 +82,47 @@ module TermBuf::Widgets
       end
     end
 
-    # A screen-sized float that dims what is behind an overlay.
+    # What a backdrop dims the screen with unless the overlay names something
+    # else.
     #
-    # The dimming is a `TermBuf::Blend`, so the colours already on the screen
-    # decide what each cell comes out as: the default keeps them and adds
-    # faint. It paints over what is behind it rather than tinting it, because
-    # a drawing surface can be written to and not read: the glyphs behind a
-    # backdrop go, and only their colours come through the blend.
-    class Backdrop < Widget
-      # Keeps the colours already on the screen and adds faint, which is a
-      # backdrop that says "not this, the thing in front of it" without
-      # choosing a palette on the application's behalf.
-      DIM = Style.blend { |under, over| under.merge(over).faint }
+    # A cell drawn in 24 bit colour has each channel of both its colours
+    # halved, so a coloured screen goes dark and keeps its hues. A cell with no
+    # colour of its own has nothing to halve and is drawn faint instead, which
+    # is the only thing that says "not this" without choosing a palette on the
+    # application's behalf. An indexed colour is left alone: what a palette
+    # entry looks like is the terminal's to decide, and halving the channels
+    # xterm would have used says nothing about what this one shows.
+    #
+    # Only the style being written is dimmed. What is already in the cell is
+    # last frame's, and the tree that put it there is about to draw itself
+    # again.
+    DIM = Style.blend { |_under, over| Overlay.dimmed over }
 
-      def initialize(z : Int32, wash : Blend? = DIM, style : Style? = nil)
-        @width = Layout::Sizing.grow
-        @height = Layout::Sizing.grow
-        @floating = Layout::Floating.on nil, z: z
-        @wash = wash
-        @style = style
-      end
+    # The blend `DIM` names, for an application composing one of its own or
+    # handing it to an overlay's `#backdrop_blend`.
+    def self.dim : Blend
+      DIM
+    end
 
-      # :ditto:
-      def z=(z : Int32) : Int32
-        self.floating = Layout::Floating.on nil, z: z
-        z
-      end
+    # :nodoc:
+    # *style* with each of its 24 bit colours halved, or faint where it has
+    # none. Not `private`: `crystal docs` cannot parse a private class method
+    # with a return type.
+    def self.dimmed(style : Style) : Style
+      foreground = style.foreground
+      background = style.background
+      return style.faint unless foreground.rgb? || background.rgb?
+
+      style.copy_with foreground: halved(foreground), background: halved(background)
+    end
+
+    # :nodoc:
+    # *color* with each channel halved, for the one kind of colour that can be.
+    def self.halved(color : Color) : Color
+      return color unless color.rgb?
+
+      red, green, blue = color.channels
+      Color.rgb red // 2, green // 2, blue // 2
     end
 
     # Whether the overlay is up.
@@ -120,15 +139,18 @@ module TermBuf::Widgets
     # Whether a click that lands anywhere else takes the overlay down.
     property? light_dismiss : Bool
 
+    # Whether everything behind the overlay is dimmed while it is up.
+    property? backdrop : Bool
+
+    # What it is dimmed with, asked for every cell drawn below the overlay.
+    # `Overlay.dim` unless the overlay was given something else.
+    property backdrop_blend : Blend = DIM
+
     # The app the overlay was opened on, or `nil` while it is down.
     getter app : App? = nil
 
     # The scope `#open` pushed, or `nil` for an overlay that is not modal.
     getter scope : Focus::Scope? = nil
-
-    # What dims the screen behind the overlay, or `nil` for one that leaves it
-    # alone.
-    getter backdrop : Backdrop? = nil
 
     # What takes the clicks that land outside, or `nil` for an overlay that
     # lets them through.
@@ -144,30 +166,26 @@ module TermBuf::Widgets
                    backdrop : Bool = false, z : Int32 = Z::POPOVER)
       @modal = modal
       @light_dismiss = light_dismiss
+      @backdrop = backdrop
       @hidden = true
-      self.backdrop = Backdrop.new z - 2 if backdrop
     end
 
-    # Which z the overlay is painted at, and what its backdrop and catcher sit
-    # below.
+    # Which z the overlay is painted at, and what its catcher sits below.
     def z : Int32
       @floating.try(&.z) || 0
     end
 
-    # Dims the screen behind the overlay with *backdrop*, or stops dimming it
-    # for `nil`.
-    def backdrop=(backdrop : Backdrop?) : Backdrop?
-      if held = @backdrop
-        remove held
-      end
+    # What everything painted below the overlay is dimmed with, or `nil` for
+    # one that is down or that leaves the screen alone.
+    #
+    # The renderer asks every root in painting order and composes the answers
+    # of the ones above each root into the view that root draws through. An
+    # overlay is therefore never dimmed by its own backdrop, and one opened
+    # over another — a toast over a dialog — is not dimmed by the dialog's.
+    def backdrop_wash : Blend?
+      return unless @open && @backdrop
 
-      @backdrop = backdrop
-      if backdrop
-        backdrop.z = z - 2
-        add backdrop
-      end
-
-      backdrop
+      @backdrop_blend
     end
 
     # The keys the overlay answers while it is up, offered after every widget
@@ -288,8 +306,6 @@ module TermBuf::Widgets
       elsif held
         held.z = z - 1
       end
-
-      @backdrop.try &.z=(z - 2)
     end
 
     # Moves the keyboard into the overlay.

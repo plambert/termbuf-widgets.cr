@@ -148,4 +148,19 @@ Spectator.describe TermBuf::Widgets::Popover do
       expect(app.focus.focus(target)).to be_false
     end
   end
+
+  describe "the backdrop it does not have" do
+    it "dims nothing behind it" do
+      app, target, popover = staged
+      target.style = TermBuf::Style.new foreground: TermBuf::Color.rgb(200, 120, 60)
+      app.frame
+      before = Fixtures.style_at app.buffer, target.rect.x, target.rect.y
+      popover.open app
+      app.frame
+
+      expect(popover.backdrop?).to be_false
+      expect(Fixtures.style_at(app.buffer, target.rect.x, target.rect.y)).to eq before
+      expect(before.foreground.channels).to eq({200, 120, 60})
+    end
+  end
 end

@@ -17,6 +17,15 @@ module TermBuf::Widgets
   # widgets naming it. A widget's `Widget#wash` goes to the same view, which is
   # what settles every cell it paints against what is already there.
   #
+  # A root can also dim what is under it rather than draw over it. Before
+  # anything is painted, every root is asked for its `Widget#backdrop_wash`,
+  # and each root is drawn through the composition of the answers given by the
+  # roots above it. A dialog therefore darkens the window behind without
+  # touching a glyph of it: the widgets down there draw themselves as they
+  # always did and the blend settles what each cell comes out as. The
+  # widget's own wash runs first and the dimming last, so what is dimmed is
+  # the style the widget settled on.
+  #
   # The screen is never cleared. A `TermBuf::Commands::Clear` throws away the
   # scroll hints a widget left behind by calling `TermBuf::View#scroll`, and
   # the painter needs those to reach for the terminal's own scrolling instead
@@ -35,9 +44,34 @@ module TermBuf::Widgets
     def render(tree : Layout::Tree, screen : Drawing, images : ImageStore? = nil) : Nil
       images.try &.clear
 
-      tree.roots_in_z_order.each do |root|
-        paint root, screen, tree.screen, Style::DEFAULT, true, images
+      roots = tree.roots_in_z_order
+      dimming = dimming_of roots
+
+      roots.each_with_index do |root, index|
+        paint root, screen, tree.screen, Style::DEFAULT, true, images, dimming[index]
       end
+    end
+
+    # What each of *roots* is dimmed by: the `Widget#backdrop_wash` of every
+    # root painted over it, composed in painting order, or `nil` for a root
+    # nothing above it dims.
+    #
+    # Walked from the top down, so each root is given what has accumulated
+    # above it before its own wash joins the pile. Nearly every frame this
+    # answers a list of nothing.
+    private def dimming_of(roots : Array(Widget)) : Array(Blend?)
+      dimming = Array(Blend?).new roots.size, nil
+      above : Blend? = nil
+
+      (roots.size - 1).downto 0 do |index|
+        dimming[index] = above
+        next unless wash = roots[index].backdrop_wash
+
+        held = above
+        above = held ? chained(wash, held) : wash
+      end
+
+      dimming
     end
 
     # Draws one widget and then its children.
@@ -46,7 +80,8 @@ module TermBuf::Widgets
     # coordinates, and *inherited* is the style this widget's own is merged
     # onto.
     private def paint(widget : Widget, screen : Drawing, clip : Rect,
-                      inherited : Style, root : Bool, images : ImageStore?) : Nil
+                      inherited : Style, root : Bool, images : ImageStore?,
+                      dim : Blend?) : Nil
       return if widget.hidden?
 
       area = widget.rect.intersect clip
@@ -54,7 +89,7 @@ module TermBuf::Widgets
 
       style = widget.style
       effective = style ? inherited.merge(style) : inherited
-      view = scissor(screen, clip).view local(widget.rect, clip), effective, widget.wash
+      view = scissor(screen, clip).view local(widget.rect, clip), effective, washed(widget, dim)
       box = framed widget
 
       view.fill box if root || style
@@ -66,7 +101,28 @@ module TermBuf::Widgets
       widget.children.each do |child|
         next if child.floating
 
-        paint child, screen, inner, effective, false, images
+        paint child, screen, inner, effective, false, images, dim
+      end
+    end
+
+    # The blend a widget's view carries: its own `Widget#wash`, and then the
+    # dimming of whatever is over it, which runs last so that what an overlay
+    # dims is the style the widget itself settled on.
+    private def washed(widget : Widget, dim : Blend?) : Blend?
+      wash = widget.wash
+      return dim unless wash
+      return wash unless dim
+
+      chained wash, dim
+    end
+
+    # A `Blend` running *first* and then *second* over what it answered. Both
+    # see the same cell and the same style underneath it; only the style being
+    # written passes from one to the other, the way `TermBuf::View` composes a
+    # nested view's blend with the one it was handed.
+    private def chained(first : Blend, second : Blend) : Blend
+      Blend.new do |under, over, column, row|
+        second.call under, first.call(under, over, column, row), column, row
       end
     end
 

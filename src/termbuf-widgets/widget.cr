@@ -142,13 +142,25 @@ module TermBuf::Widgets
     #
     # The renderer hands this to the view the widget and everything under it
     # draws through, so it is asked in the widget's own coordinates and applies
-    # to the ground the renderer fills as much as to anything drawn on it. What
-    # an `Overlay::Backdrop` dims a screen with.
+    # to the ground the renderer fills as much as to anything drawn on it.
     #
     # Named for what `TermBuf::Buffer#fill` calls it — a wash over what is
     # already painted — rather than `blend`, which several widgets already use
     # for a `TermBuf::Blend` of their own over part of what they draw.
     property wash : Blend? = nil
+
+    # What everything painted *below* this widget is settled through, or `nil`
+    # for a widget that leaves the screen alone, which is nearly all of them.
+    #
+    # Only a root — the tree's own root or a float — is asked. The renderer
+    # composes the answers of every root above the one it is about to draw and
+    # hands the result to it, so a widget can dim what it covers without
+    # drawing over it. `Overlay#backdrop_wash` is the one implementation there
+    # is, and `Widget#wash`, which settles what the widget draws itself, is the
+    # other half of the pair.
+    def backdrop_wash : Blend?
+      nil
+    end
 
     # The keys this widget answers, or `nil` for one that answers none.
     #

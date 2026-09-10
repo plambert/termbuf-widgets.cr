@@ -145,10 +145,32 @@ Spectator.describe TermBuf::Widgets::Drawer do
 
   describe "the backdrop" do
     it "dims what is behind it when it was asked for" do
-      ground, drawer, _inner = staged backdrop: true
+      ground, drawer, _inner = staged Drawer::Edge::Right, backdrop: true
       drawer.open ground.app
 
-      expect(ground.style_at(30, 6).attributes.faint?).to be_true
+      expect(ground.style_at(0, 6).attributes.faint?).to be_true
+    end
+
+    it "leaves the characters behind it where they were" do
+      ground, drawer, _inner = staged Drawer::Edge::Right, backdrop: true
+      drawer.open ground.app
+
+      expect(Fixtures.text_of(ground.painted).all? &.starts_with?(".")).to be_true
+    end
+
+    it "halves the colours of a cell that has any" do
+      ground, drawer, _inner = staged Drawer::Edge::Right, backdrop: true
+      ground.under.style = TermBuf::Style.new foreground: TermBuf::Color.rgb(200, 120, 60)
+      drawer.open ground.app
+
+      expect(ground.style_at(0, 6).foreground.channels).to eq({100, 60, 30})
+    end
+
+    it "leaves the screen alone when it was not asked for" do
+      ground, drawer, _inner = staged Drawer::Edge::Right
+      drawer.open ground.app
+
+      expect(ground.style_at(0, 6).attributes.faint?).to be_false
     end
   end
 end

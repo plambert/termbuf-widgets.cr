@@ -160,35 +160,90 @@ Spectator.describe TermBuf::Widgets::Dialog do
       expect(ground.style_at(0, 0).attributes.faint?).to be_true
     end
 
+    it "leaves the characters behind it where they were" do
+      ground, dialog = staged
+      before = Fixtures.text_of ground.painted
+      dialog.open ground.app
+      after = Fixtures.text_of ground.painted
+
+      expect(before.all? &.starts_with?(".")).to be_true
+      expect(after.all? &.starts_with?(".")).to be_true
+      expect(after.any? &.includes?("question")).to be_true
+    end
+
+    it "halves the colours of a cell that has any" do
+      ground, dialog = staged
+      ground.under.style = TermBuf::Style.new(
+        foreground: TermBuf::Color.rgb(200, 120, 60),
+        background: TermBuf::Color.rgb(30, 45, 80))
+      dialog.open ground.app
+
+      dimmed = ground.style_at 0, 0
+      expect(dimmed.foreground.channels).to eq({100, 60, 30})
+      expect(dimmed.background.channels).to eq({15, 22, 40})
+      expect(dimmed.attributes.faint?).to be_false
+    end
+
+    it "leaves the dialog's own cells alone" do
+      ground, dialog = staged
+      dialog.open ground.app
+      ground.app.frame
+
+      inside = dialog.rect
+      expect(ground.style_at(inside.x + 1, inside.y + 1).attributes.faint?).to be_false
+    end
+
+    it "leaves an overlay above it alone" do
+      ground, dialog = staged
+      toasts = TermBuf::Widgets::Toasts.new ground.app
+      toast = toasts.show "saved", ttl: nil
+      dialog.open ground.app
+      ground.app.frame
+
+      where = toast.label.rect
+      expect(ground.style_at(where.x, where.y).attributes.faint?).to be_false
+      expect(Fixtures.text_of(ground.painted).any? &.includes?("saved")).to be_true
+    end
+
     it "leaves the screen alone when it was not asked for" do
       ground, dialog = staged backdrop: false
       dialog.open ground.app
 
       expect(ground.style_at(0, 0).attributes.faint?).to be_false
-      expect(dialog.backdrop).to be_nil
+      expect(dialog.backdrop?).to be_false
     end
 
     it "stops dimming once the dialog has gone" do
       ground, dialog = staged
+      ground.under.style = TermBuf::Style.new foreground: TermBuf::Color.rgb(200, 120, 60)
+      before = ground.style_at 0, 0
       dialog.open ground.app
       dialog.close
 
+      expect(ground.style_at(0, 0)).to eq before
+    end
+
+    it "dims with whatever the dialog was given instead" do
+      ground, dialog = staged
+      dialog.backdrop_blend = TermBuf::Style.blend { |_under, over| over.strike }
+      dialog.open ground.app
+
+      expect(ground.style_at(0, 0).attributes.strike?).to be_true
       expect(ground.style_at(0, 0).attributes.faint?).to be_false
     end
   end
 
   describe "the painting order" do
-    it "puts the backdrop under the dialog and the dialog over everything" do
+    it "puts the catcher under the dialog and the dialog over everything" do
       ground, dialog = staged
       dialog.open ground.app
       ground.app.frame
 
       order = ground.app.tree.roots_in_z_order
-      expect(order.size).to eq 4
+      expect(order.size).to eq 3
       expect(order[0]).to be ground.root
-      expect(order[1]).to be dialog.backdrop
-      expect(order[2]).to be dialog.catcher
-      expect(order[3]).to be dialog
+      expect(order[1]).to be dialog.catcher
+      expect(order[2]).to be dialog
     end
   end
 

@@ -15,7 +15,8 @@ module TermBuf::Widgets
   # It is modal by default: a focus scope is pushed with the dialog as its
   # root, so tab moves inside it and a key nothing in it claims stops there
   # rather than reaching the window behind. A `Overlay::Catcher` does the same
-  # for the pointer, and a `Overlay::Backdrop` dims what is behind it.
+  # for the pointer, and the renderer draws everything behind the dialog
+  # through `Overlay.dim`, so the window is darkened rather than covered.
   #
   # Pressing one of the actions takes the dialog down and says `Closed` with
   # which one it was; `Escape` takes it down with `nil`. The application
@@ -82,8 +83,6 @@ module TermBuf::Widgets
                    style : Style? = nil,
                    default_key : Key? = Key.named(Key::Name::Enter),
                    cancel_key : Key? = Key.named(Key::Name::Escape))
-      # Built before the overlay is, because putting a backdrop up is an
-      # `Widget#add` and every one of those reaches back through `self`.
       @actions = ButtonGroup.new actions, gap: 1
       @action_row = Panel.new direction: Layout::Direction::Row,
         width: Layout::Sizing.grow, align_x: actions_align
