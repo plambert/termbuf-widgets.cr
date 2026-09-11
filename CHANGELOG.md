@@ -40,6 +40,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- The README opens with a whole program that compiles and then maps the public API: `Widget` and
+  its layout properties, the sizing modes, `Layout::Tree` and floats, `Renderer`, `App`, focus,
+  routing, messages, `Keymap`, and the widget catalogue a line at a time.
 - `VirtualList#on_draw`, `Tree#on_draw` and `SelectionList#on_draw` take one more argument: whether
   the list has the keyboard, after the flag saying whether the row is the chosen one. A block
   written against the old four is a compile error, and takes a fifth parameter to fix. The default
@@ -80,10 +83,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   itself unavailable rather than looking as though it worked.
 - `Readout`, the base for a widget drawing one line of text it works out for itself, as against a
   `Label` drawing text it was handed.
-- `examples/widgets.cr` has a sixth page, chosen with `6`: a spinner, a clock, a relative time, a
-  date, icons, a picture, a link that shows its address when the keyboard reaches it, and a button
-  that copies it.
-
+- `examples/widgets.cr` has six pages, chosen with `1` to `6`: the panes it always had, a table of
+  a hundred thousand rows, a tree that makes each level up when it is asked for, the navigation
+  widgets, the overlays, and the display widgets that move on their own. Every page says on screen
+  what should be there and what each key should do to it.
 - The overlay group of widgets, under `src/termbuf-widgets/widgets/overlay/`: `Dialog`, `Popover`,
   `DropdownMenu`, `Drawer`, `Toast` with the `Toasts` that owns them, and `HelpOverlay`. Each is a
   float put up with `#open` and taken down with `#close`; a modal one pushes a focus scope with
@@ -100,8 +103,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   into the tree like any other event. Without the procs nothing is armed.
 - `App#keymap=`, which puts a keymap under the application and its base focus scope at once, so
   `app.keymap = app.keymap.merge other` adds a binding without losing the ones that were there.
-- `examples/widgets.cr` has a fourth page, chosen with `4`: a dialog, a menu, a drawer and a stack
-  of toasts, each on a button.
 - The display group of widgets, under `src/termbuf-widgets/widgets/display/`: `StatusBar`,
   `ProgressBar`, `SingleValue`, `FormattedNumber`, `BytesDisplay` and `Rating`. Each is a leaf that
   fits its own content and draws into the box the layout gave it; none owns a timer, so a progress
@@ -112,8 +113,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and the `Nodes` source a tree reads. Each asks its source only for the rows that are showing, so
   a table of a hundred thousand rows costs what a table of twenty does. Sorting a grid and
   flattening a tree are the two places that ask for more, and both say so.
-- `examples/widgets.cr` has three pages now, chosen with `1`, `2` and `3`: the panes it always had,
-  a table of a hundred thousand rows, and a tree that makes each level up when it is asked for.
 - `Button` and `ButtonGroup`. A button says `Button::Pressed` for `Enter`, `Space` and a click that
   goes down and comes up inside it; a group is a row or a column the arrows along it move between,
   and an exclusive one is a radio set saying `ButtonGroup::Changed`.
@@ -159,7 +158,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   one row whatever is in it; an exclusive group is an accordion. Says `Disclosure::Toggled`.
 - `Linking.link_id`, which interns a hyperlink through whatever surface a widget is drawing on by
   walking out through the views to the buffer or terminal underneath.
-- `examples/widgets.cr` has a fourth page, chosen with `4`: the navigation widgets on one screen.
 - `Option(T)`, a label and the value it stands for, which is what the list widgets are over.
 - `SelectionList`, a window over options with a mark against the ones chosen. `Space` chooses,
   `Enter` says `SelectionList::Confirmed`, and every change says `SelectionList::Changed`. A

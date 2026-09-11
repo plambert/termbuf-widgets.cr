@@ -44,11 +44,15 @@ module TermBuf::Widgets
       @ellipsis = ellipsis
     end
 
+    # Sets the text, throwing away the measurement taken of the old one.
     def text=(text : String) : String
       forget unless @text == text
       previous_def
     end
 
+    # Sets where the lines may break, throwing away the lines they last broke
+    # into. The measurement survives: where a word may break does not change
+    # how wide it is.
     def wrap=(wrap : Layout::Wrap) : Layout::Wrap
       @wrapped = nil unless @wrap == wrap
       previous_def

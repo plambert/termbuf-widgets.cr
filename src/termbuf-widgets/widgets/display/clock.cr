@@ -83,6 +83,8 @@ module TermBuf::Widgets
       invalidate_layout
     end
 
+    # Sets the format and takes a fresh reading through it at once, so the
+    # widget is never showing the old one.
     def format=(format : String) : String
       return format if @format == format
 

@@ -41,12 +41,14 @@ module TermBuf::Widgets
       # Called after any key or paste that changed the text.
       property on_change : Proc(Nil)? = nil
 
+      # Takes the key the way a field does, then says so if the text moved.
       def press(key : Key) : Nil
         before = text
         super
         @on_change.try &.call unless text == before
       end
 
+      # :ditto:
       def paste(text : String) : Nil
         before = self.text
         super

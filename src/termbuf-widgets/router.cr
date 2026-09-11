@@ -13,10 +13,10 @@ module TermBuf::Widgets
   # An event aimed at a place on the screen rather than at whatever has the
   # keyboard.
   #
-  # `TermBuf` has no mouse event yet. Any event that includes this is routed by
-  # position: the router asks `Layout::Tree#hit` what is under the point and
-  # starts the chain there. When a mouse event does land, it includes this and
-  # nothing here changes.
+  # Any event that includes this is routed by position: the router asks
+  # `Layout::Tree#hit` what is under the point and starts the chain there.
+  # `TermBuf::Input::Events::Mouse` includes it, reopened at the foot of this
+  # file, and an application's own event can as well.
   module Positioned
     # Column the event happened at, in buffer coordinates.
     abstract def x : Int32

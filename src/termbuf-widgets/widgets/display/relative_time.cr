@@ -34,7 +34,7 @@ module TermBuf::Widgets
 
     # Days in the month and the year this counts by. Neither is a calendar
     # month or a leap year: "3 months ago" is an approximation, and one drawn
-    # from the real length of the intervening months would still be one.
+    # from the lengths of the intervening months would still be one.
     MONTH =  30
     YEAR  = 365
 
@@ -115,6 +115,8 @@ module TermBuf::Widgets
       invalidate_layout
     end
 
+    # Points the widget at another moment and takes a fresh reading at once,
+    # so what is drawn is never a description of the moment before.
     def at=(at : Time) : Time
       return at if @at == at
 
