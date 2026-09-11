@@ -1,5 +1,5 @@
 name: termbuf-widgets
-version: 0.1.0
+version: 0.5.0
 
 authors:
   - Paul M. Lambert <plambert@plambert.net>
@@ -16,7 +16,7 @@ description: |
 dependencies:
   termbuf:
     github: plambert/termbuf.cr
-    branch: main
+    version: "~> 0.5"
 
 development_dependencies:
   spectator:

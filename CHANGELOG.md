@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-09-11
+
 ### Fixed
 
 - `Tab` moves between the panes of the panes page in `examples/widgets.cr`, and the screen says
