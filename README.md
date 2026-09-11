@@ -9,6 +9,13 @@ can draw into.
 
 Requires Crystal 1.21 or later.
 
+## Related shards
+
+* **[plambert/termbuf.cr](https://github.com/plambert/termbuf.cr)** — the screen: a cell buffer,
+  capability detection, and a diffed repaint to the terminal
+* **[plambert/termbuf-input.cr](https://github.com/plambert/termbuf-input.cr)** — handle keyboard
+  and mouse input, as well as typical signals
+
 ## Getting started
 
 ```yaml
