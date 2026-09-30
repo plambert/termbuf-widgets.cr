@@ -7,6 +7,24 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A widget's picture is no longer drawn out of shape. It went across the whole box whatever
+  proportions it had, so a cover taller than it is wide came out stretched sideways. `Picture` and
+  `Icon` now keep the picture's proportions and centre it in what it does not fill; `Panel`
+  stretches, because its picture is a backdrop behind other widgets and one that kept its
+  proportions would leave part of the panel bare. All three take `fit:` and all three have a
+  `#fit` property, so either behaviour is a word away. The fix itself is in termbuf: see
+  `TermBuf::Placement#fit`.
+
+### Added
+
+- `Picture#fit`, `Icon#fit` and `Panel#fit`, and `fit:` on each of their constructors.
+
+### Changed
+
+- Needs termbuf 0.8.
+
 ## [0.6.0] - 2026-09-29
 
 ### Changed

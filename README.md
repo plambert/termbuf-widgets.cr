@@ -317,6 +317,13 @@ A placement an application made itself, with `TermBuf::Image#show`, is not a fra
 touches it. That is how a background picture behind a panel works: put it up once and stop thinking
 about it.
 
+`#fit` says what to do when the picture is not the shape of the box. `Picture` and `Icon` keep the
+picture's proportions and centre it in whatever it does not fill, because a picture in a box is a
+picture somebody wants to look at. `Panel` stretches instead: its picture is a backdrop behind other
+widgets, and one that kept its proportions would leave part of the panel bare. Either can be told
+otherwise. See `TermBuf::Placement::Fit`, and `TermBuf::ImageStore#cell_size` for what a fit is
+worked out from.
+
 ## The widgets
 
 ### Primitives

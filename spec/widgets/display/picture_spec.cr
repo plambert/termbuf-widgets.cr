@@ -24,6 +24,18 @@ module Fixtures
     TermBuf::Pixels.rgb Bytes.new(8 * 8 * 3, 7_u8), 8, 8
   end
 
+  # Taller than wide, like a cover.
+  def self.portrait : TermBuf::Pixels
+    TermBuf::Pixels.rgb Bytes.new(255 * 340 * 3, 3_u8), 255, 340
+  end
+
+  # A store that knows how large a cell is, which is what a fit needs.
+  def self.measured_store : TermBuf::ImageStore
+    made = graphical_store
+    made.cell_size = {8, 16}
+    made
+  end
+
   # The escape sequences a store has queued, with the cursor moves left out.
   def self.sequences(store : TermBuf::ImageStore) : Array(String)
     store.take_pending.select &.starts_with? "\e_G"
@@ -190,6 +202,47 @@ Spectator.describe TermBuf::Widgets::Picture do
       sent = Fixtures.sequences store
       expect(sent.count(&.includes? "a=T")).to eq 0
       expect(sent.count(&.includes? "x=4,y=4,w=4,h=4,")).to eq 1
+    end
+  end
+
+  # A picture put across cells it is not the shape of comes out stretched unless
+  # something says otherwise, and a picture in a box is a picture somebody wants
+  # to look at.
+  describe "#fit" do
+    it "fits inside the box it was given, and centres what is left" do
+      store = Fixtures.measured_store
+      shot = Picture.new Fixtures.portrait, columns: 79, rows: 17
+      Fixtures.painted boxed(shot), 100, 30, images: store
+
+      here = store.placements.first
+      expect(here.fit).to eq TermBuf::Placement::Fit::Inside
+      expect(here.bounds).to eq Rect.new(0, 0, 79, 17)
+      expect(here.drawn).to eq Rect.new(26, 0, 26, 17)
+    end
+
+    it "stretches across the whole box when it is told to" do
+      store = Fixtures.measured_store
+      shot = Picture.new Fixtures.portrait, columns: 79, rows: 17, fit: :stretch
+      Fixtures.painted boxed(shot), 100, 30, images: store
+
+      here = store.placements.first
+      expect(here.drawn).to eq here.bounds
+      expect(Fixtures.sequences(store).first).to contain "c=79,r=17,"
+    end
+
+    it "sends the picture again when only the fit changed" do
+      store = Fixtures.measured_store
+      shot = Picture.new Fixtures.portrait, columns: 79, rows: 17
+      root = boxed shot
+      Fixtures.painted root, 100, 30, images: store
+      store.take_pending
+
+      shot.fit = :stretch
+      Fixtures.painted root, 100, 30, images: store
+
+      sent = Fixtures.sequences store
+      expect(sent.count(&.includes? "a=T")).to eq 0
+      expect(sent.count(&.includes? "c=79,r=17,")).to eq 1
     end
   end
 

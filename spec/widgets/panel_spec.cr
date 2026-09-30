@@ -145,6 +145,31 @@ Spectator.describe TermBuf::Widgets::Panel do
       expect(images.placements.size).to eq 1
     end
 
+    # A panel's picture is a backdrop behind a box of other widgets, and one that
+    # keeps its proportions leaves part of the panel bare.
+    it "stretches its picture across the whole panel" do
+      panel = Panel.new pixels: dot
+      images = store
+      Fixtures.render panel, 10, 4, images: images
+
+      here = images.placements.first
+      expect(here.fit).to eq TermBuf::Placement::Fit::Stretch
+      expect(here.drawn).to eq here.bounds
+    end
+
+    it "fits it inside the panel when it is told to" do
+      panel = Panel.new pixels: TermBuf::Pixels.rgb(Bytes.new(2 * 8 * 3, 1_u8), 2, 8),
+        fit: :inside
+      images = TermBuf::ImageStore.new TermBuf::Capabilities::NONE
+      images.cell_size = {8, 16}
+      Fixtures.render panel, 10, 4, images: images
+
+      here = images.placements.first
+      expect(here.bounds).to eq Rect.new(0, 0, 10, 4)
+      # A 2x8 picture in 80x64 pixels of cells fits to 16x64, which is 2 cells.
+      expect(here.drawn).to eq Rect.new(4, 0, 2, 4)
+    end
+
     it "asks for nothing at all without a store" do
       expect(Fixtures.render(Panel.new(pixels: dot), 6, 2)).to eq ["", ""]
     end

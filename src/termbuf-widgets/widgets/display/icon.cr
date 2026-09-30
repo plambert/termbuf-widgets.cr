@@ -55,6 +55,12 @@ module TermBuf::Widgets
     # `TermBuf::Placement#crop`.
     property crop : Rect? = nil
 
+    # What to do when the picture is not the shape of the box. The whole picture
+    # goes inside the box at its own proportions by default, centred in whatever
+    # it does not fill, because a picture in a box is a picture somebody wants to
+    # look at. See `TermBuf::Placement::Fit`.
+    property fit : TermBuf::Placement::Fit = :inside
+
     # How clusters are measured, taken from the tree at every layout.
     getter policy : Unicode::WidthPolicy = Unicode::WidthPolicy::DEFAULT
 
@@ -64,6 +70,7 @@ module TermBuf::Widgets
                    pixels : Pixels? = nil,
                    z : Int32 = 0,
                    crop : Rect? = nil,
+                   fit : TermBuf::Placement::Fit = :inside,
                    align : Unicode::Align = Unicode::Align::Left,
                    style : Style? = nil)
       @fallback = fallback
@@ -71,6 +78,7 @@ module TermBuf::Widgets
       @pixels = pixels
       @z = z
       @crop = crop
+      @fit = fit
       @align = align
       @style = style
       @width = Layout::Sizing.fit
@@ -128,7 +136,7 @@ module TermBuf::Widgets
       pixels = @pixels
       return if pixels.nil? || rect.empty?
 
-      frame.show picture_for(frame, pixels), rect, @z, @crop
+      frame.show picture_for(frame, pixels), rect, @z, @crop, @fit
     end
   end
 end

@@ -33,6 +33,16 @@ module TermBuf::Widgets
     # `TermBuf::Placement#crop`.
     property crop : Rect? = nil
 
+    # What to do when the picture is not the shape of the panel.
+    #
+    # Stretched, unlike `Picture` and `Icon`. A panel's picture is a backdrop
+    # behind a box of other widgets, and a backdrop that keeps its proportions
+    # leaves part of the panel bare, which reads as a mistake rather than as a
+    # picture. A panel showing something that would look wrong stretched — a
+    # photograph rather than a texture — should say `fit: :inside` and accept the
+    # bare cells. See `TermBuf::Placement::Fit`.
+    property fit : TermBuf::Placement::Fit = :stretch
+
     # What the border is drawn in while the keyboard is inside the panel, or
     # `nil` for one that looks the same either way.
     #
@@ -55,7 +65,8 @@ module TermBuf::Widgets
                    style : Style? = nil,
                    @pixels : Pixels? = nil,
                    @image_z : Int32 = -1,
-                   @crop : Rect? = nil)
+                   @crop : Rect? = nil,
+                   @fit : TermBuf::Placement::Fit = :stretch)
       @direction = direction
       @width = width
       @height = height
@@ -95,7 +106,7 @@ module TermBuf::Widgets
       pixels = @pixels
       return if pixels.nil? || rect.empty?
 
-      frame.show picture_for(frame, pixels), rect, @image_z, @crop
+      frame.show picture_for(frame, pixels), rect, @image_z, @crop, @fit
     end
   end
 end
