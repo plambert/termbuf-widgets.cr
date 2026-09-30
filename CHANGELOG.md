@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-29
+
 ### Fixed
 
 - A widget's picture is no longer drawn out of shape. It went across the whole box whatever
