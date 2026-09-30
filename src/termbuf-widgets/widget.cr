@@ -367,15 +367,22 @@ module TermBuf::Widgets
     def draw(view : View) : Nil
     end
 
-    # Puts whatever pictures this widget wants on the screen, at *frame* in
+    # Puts whatever pictures this widget wants on the screen, across *rect* in
     # buffer coordinates.
     #
-    # Called once a frame, after the store has been emptied, so a widget states
-    # what it wants on screen now rather than tracking what it put there last
-    # time. Nothing is called at all without a store, and a store built for a
+    # Called once a frame, so a widget states what it wants on screen now rather
+    # than tracking what it put there last time. Saying the same thing again is
+    # free: *frame* holds the last frame's placements over and takes one back
+    # where the picture and the cells are the same, so nothing reaches the
+    # terminal for a box that did not change.
+    #
+    # Nothing is called at all without an image store, and a store built for a
     # terminal that cannot draw pictures sends no bytes, so a widget that wants
-    # one costs nothing where there is no way to show it.
-    def place_images(store : ImageStore, frame : Rect) : Nil
+    # a picture costs nothing where there is no way to show it.
+    #
+    # `TermBuf::ImageStore::Frame#show` takes a `TermBuf::Image` rather than
+    # pixels. `Pictured` is what a widget holding pixels uses to get one.
+    def place_images(frame : ImageStore::Frame, rect : Rect) : Nil
     end
 
     # Where the terminal's cursor belongs while this widget has focus, or

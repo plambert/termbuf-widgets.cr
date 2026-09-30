@@ -1,3 +1,4 @@
+require "../../pictured"
 require "../../widget"
 require "./readout"
 
@@ -5,19 +6,30 @@ module TermBuf::Widgets
   # A picture drawn over the cells it is given, with words for the terminals
   # that cannot draw one.
   #
-  #     shot = Picture.new Image.png(path), columns: 40, rows: 12,
+  #     shot = Picture.new Pixels.png(path), columns: 40, rows: 12,
   #       alt: "the graph"
   #
-  # Named `Picture` rather than `Image` because `TermBuf::Image` is the thing
-  # it holds: a widget of that name would hide it from every other widget in
-  # this namespace, `Panel#image` included.
+  # Named `Picture` rather than `Image` because `TermBuf::Image` is what it ends
+  # up holding: a widget of that name would hide it from every other widget in
+  # this namespace, `Panel#pixels` included.
+  #
+  # ### What it holds
+  #
+  # `#pixels` is what an application gives it: a value, with no terminal behind
+  # it. `#image` is the registry entry those pixels turned into, which does not
+  # exist until a frame has run with an image store in it. An application that
+  # wants more of the picture than this widget offers — upload it early, show it
+  # somewhere else as well, crop it by hand — has the entry there afterwards.
+  #
+  # Giving `#pixels` something new takes the old picture out of the terminal, so
+  # assign when the picture changed rather than every frame.
   #
   # ### Size
   #
   # *columns* and *rows* fix the box, and leaving either out lets it grow to
   # whatever the layout has spare. Nothing is decoded or scaled here — the
   # pixels go to the terminal along with the number of cells to draw them
-  # across, and the terminal does the scaling. That is the whole of `#place`.
+  # across, and the terminal does the scaling.
   #
   # ### When there is no picture
   #
@@ -32,8 +44,10 @@ module TermBuf::Widgets
   # its alt text over itself, so leave `#alt` empty for one of those. See
   # `TermBuf::Placement#z`.
   class Picture < Widget
-    # The pixels, or `nil` for a widget holding none yet.
-    property image : Image? = nil
+    include Pictured
+
+    # The pixels to draw, or `nil` for a widget holding none.
+    getter pixels : Pixels? = nil
 
     # What is written in the box for a terminal that draws no pictures, or
     # empty for nothing at all.
@@ -45,24 +59,36 @@ module TermBuf::Widgets
     # Where the picture sits against the text. See `TermBuf::Placement#z`.
     property z : Int32 = 0
 
-    def initialize(@image : Image? = nil,
+    # Which rectangle of the picture's own pixels to draw, or `nil` for all of
+    # them. Stepping this is how one sheet of sprites becomes an animation. See
+    # `TermBuf::Placement#crop`.
+    property crop : Rect? = nil
+
+    def initialize(@pixels : Pixels? = nil,
                    columns : Int32? = nil,
                    rows : Int32? = nil,
                    alt : String = "",
                    align : Unicode::Align = Unicode::Align::Center,
                    z : Int32 = 0,
+                   crop : Rect? = nil,
                    style : Style? = nil)
       @alt = alt
       @align = align
       @z = z
+      @crop = crop
       @style = style
       @width = columns ? Layout::Sizing.fixed(columns) : Layout::Sizing.grow
       @height = rows ? Layout::Sizing.fixed(rows) : Layout::Sizing.grow
     end
 
-    # Whether there is anything to place.
-    def image? : Bool
-      !@image.nil?
+    # Draws different pixels, and takes the old ones out of the terminal.
+    #
+    # Nothing is compared: a widget is told its picture changed rather than
+    # asked, and comparing a few hundred kilobytes to find out would cost more
+    # than it saved. Assign when the picture changed.
+    def pixels=(value : Pixels?) : Pixels?
+      forget_picture
+      @pixels = value
     end
 
     # ------------------------------------------------------------- layout
@@ -86,14 +112,16 @@ module TermBuf::Widgets
 
     # Asks for the picture to be drawn across the box this widget was given.
     #
-    # Nothing is asked at all without a store, and a store built for a terminal
-    # that draws no pictures sends no bytes, so a picture in a tree costs
-    # nothing where there is no way to show it.
-    def place_images(store : ImageStore, frame : Rect) : Nil
-      picture = @image
-      return if picture.nil? || frame.empty?
+    # The pixels are registered here, the first frame there is a store to
+    # register them with, and the entry is kept afterwards. Nothing is asked at
+    # all without a store, and a store built for a terminal that draws no
+    # pictures sends no bytes, so a picture in a tree costs nothing where there
+    # is no way to show it.
+    def place_images(frame : ImageStore::Frame, rect : Rect) : Nil
+      pixels = @pixels
+      return if pixels.nil? || rect.empty?
 
-      store.place picture, frame, @z
+      frame.show picture_for(frame, pixels), rect, @z, @crop
     end
   end
 end

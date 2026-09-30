@@ -90,15 +90,14 @@ Spectator.describe TermBuf::Widgets::Panel do
   end
 
   describe "a picture" do
-    let(pixels) { Bytes[255, 0, 0] }
-    let(image) { TermBuf::Image.rgb(pixels, 1, 1) }
+    let(dot) { TermBuf::Pixels.rgb(Bytes[255, 0, 0], 1, 1) }
 
     def store : TermBuf::ImageStore
       TermBuf::ImageStore.new TermBuf::Capabilities::NONE
     end
 
     it "asks for one across the box the panel draws in" do
-      panel = Panel.new image: image
+      panel = Panel.new pixels: dot
       images = store
       Fixtures.render panel, 10, 4, images: images
 
@@ -107,7 +106,7 @@ Spectator.describe TermBuf::Widgets::Panel do
     end
 
     it "puts it under the text by default" do
-      panel = Panel.new image: image
+      panel = Panel.new pixels: dot
       images = store
       Fixtures.render panel, 6, 2, images: images
 
@@ -115,7 +114,7 @@ Spectator.describe TermBuf::Widgets::Panel do
     end
 
     it "puts it over the text when it is asked to" do
-      panel = Panel.new image: image, image_z: 1
+      panel = Panel.new pixels: dot, image_z: 1
       images = store
       Fixtures.render panel, 6, 2, images: images
 
@@ -123,7 +122,7 @@ Spectator.describe TermBuf::Widgets::Panel do
     end
 
     it "leaves the margin out of it" do
-      panel = Panel.new image: image, margin: Layout::Padding.all(1)
+      panel = Panel.new pixels: dot, margin: Layout::Padding.all(1)
       images = store
       Fixtures.render panel, 10, 4, images: images
 
@@ -138,7 +137,7 @@ Spectator.describe TermBuf::Widgets::Panel do
     end
 
     it "asks again every frame rather than leaving the last one up" do
-      panel = Panel.new image: image
+      panel = Panel.new pixels: dot
       images = store
       Fixtures.render panel, 6, 2, images: images
       Fixtures.render panel, 6, 2, images: images
@@ -147,7 +146,7 @@ Spectator.describe TermBuf::Widgets::Panel do
     end
 
     it "asks for nothing at all without a store" do
-      expect(Fixtures.render(Panel.new(image: image), 6, 2)).to eq ["", ""]
+      expect(Fixtures.render(Panel.new(pixels: dot), 6, 2)).to eq ["", ""]
     end
   end
 

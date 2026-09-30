@@ -7,6 +7,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- Needs termbuf 0.7, and skips termbuf 0.6 entirely: 0.5.0 of this shard was the last to build
+  against termbuf 0.5, and nothing here ever asked for 0.6.
+- `Widget#place_images(store : ImageStore, frame : Rect)` is now
+  `#place_images(frame : ImageStore::Frame, rect : Rect)`. The picture goes through the frame the
+  renderer opened rather than straight at the store, which is what makes saying the same thing twice
+  free. Every override in the shard changed with it.
+- `Renderer.render` no longer empties the image store at the top of every frame, which had each
+  widget's picture transmitted again on every repaint — a 400KB cover down an ssh connection per
+  keystroke. The whole walk now runs inside one `TermBuf::ImageStore#frame`. A placement an
+  application made itself is not that frame's and is left where it is.
+- `Picture`, `Panel` and `Icon` hold `TermBuf::Pixels` rather than what used to be called
+  `TermBuf::Image`, and own the registry entry those pixels turn into.
+  - `Picture#image` and `Icon#image` are now `#pixels`, and `Panel#image` is now `#pixels`.
+  - `#image` on all three is the `TermBuf::Image` the pixels were registered as, `nil` until a frame
+    has put them up. An application that wants more of the picture than the widget offers reads it
+    there.
+  - Assigning `#pixels` takes the old picture out of the terminal, so assign when the picture
+    changed rather than every frame. Nothing is compared: a widget is told, not asked, and
+    comparing a few hundred kilobytes to find out would cost more than it saved.
+  - `Picture#image?` is gone. It answered `Bool` for "is there a picture", which beside an `#image`
+    answering an `Image?` would be a trap. `#pixels` answers the same question.
+  - `Panel.new` takes `pixels:` where it took `image:`, and `Icon.new` likewise.
+
+### Added
+
+- `Pictured`, the module behind the three widgets that carry a picture: it holds the registry entry,
+  makes it on the first frame that has a store, and takes it back out of the terminal when the
+  pixels change. A widget of one's own that draws a picture includes it and writes one
+  `#place_images`.
+- `Picture#crop`, `Panel#crop` and `Icon#crop`, which draw a rectangle of the picture rather than
+  all of it. Stepping one is how a sheet of sprites becomes an animation. The protocol calls it the
+  source rectangle; `crop` is the same thing in a word a reader can guess, and `source` on a widget
+  would read as where the picture came from. See `TermBuf::Placement#crop`.
+
 ### Fixed
 
 - The suite compiles whatever order `crystal spec` globs its files in. It did not: in some orders
@@ -28,9 +64,6 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   non-generic class in the module's place has its instance variables settled once, so no order comes
   into it. Crystal 1.21.1.
 
-### Changed
-
-### Added
 ## [0.5.0] - 2026-09-11
 
 ### Fixed

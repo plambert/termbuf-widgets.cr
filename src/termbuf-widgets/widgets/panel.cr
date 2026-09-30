@@ -1,3 +1,4 @@
+require "../pictured"
 require "../widget"
 require "./border"
 
@@ -13,17 +14,24 @@ module TermBuf::Widgets
   #       height: Layout::Sizing.grow, padding: Layout::Padding.all(1)
   #     root.add header, body, footer
   class Panel < Widget
+    include Pictured
+
     # A picture drawn across the panel, or `nil` for none.
     #
     # Nothing is decoded or scaled here: the terminal is handed the bytes and
     # the cells to draw them across. A terminal that draws no pictures gets
-    # nothing sent, so a panel can carry one unconditionally.
-    property image : Image? = nil
+    # nothing sent, so a panel can carry one unconditionally. See
+    # `Picture#pixels` for what this is and what `#image` is.
+    getter pixels : Pixels? = nil
 
     # Where the picture sits against the text. Negative is under it, which is
     # what a background wants: the cells keep their glyphs and the picture
     # shows through wherever they are blank. Zero and above is over the text.
     property image_z : Int32 = -1
+
+    # Which rectangle of the picture to draw, or `nil` for all of it. See
+    # `TermBuf::Placement#crop`.
+    property crop : Rect? = nil
 
     # What the border is drawn in while the keyboard is inside the panel, or
     # `nil` for one that looks the same either way.
@@ -45,8 +53,9 @@ module TermBuf::Widgets
                    align_y : Layout::Align = Layout::Align::Start,
                    border : Border? = nil,
                    style : Style? = nil,
-                   @image : Image? = nil,
-                   @image_z : Int32 = -1)
+                   @pixels : Pixels? = nil,
+                   @image_z : Int32 = -1,
+                   @crop : Rect? = nil)
       @direction = direction
       @width = width
       @height = height
@@ -74,12 +83,19 @@ module TermBuf::Widgets
       box.with_style lit
     end
 
-    # Puts the panel's picture across the box it draws in.
-    def place_images(store : ImageStore, frame : Rect) : Nil
-      picture = @image
-      return if picture.nil? || frame.empty?
+    # Draws different pixels, and takes the old ones out of the terminal. See
+    # `Picture#pixels=`.
+    def pixels=(value : Pixels?) : Pixels?
+      forget_picture
+      @pixels = value
+    end
 
-      store.place picture, frame, @image_z
+    # Puts the panel's picture across the box it draws in.
+    def place_images(frame : ImageStore::Frame, rect : Rect) : Nil
+      pixels = @pixels
+      return if pixels.nil? || rect.empty?
+
+      frame.show picture_for(frame, pixels), rect, @image_z, @crop
     end
   end
 end

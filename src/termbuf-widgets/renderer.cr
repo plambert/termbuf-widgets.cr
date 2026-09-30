@@ -36,19 +36,30 @@ module TermBuf::Widgets
 
     # Draws every root of *tree* onto *screen*, lowest first.
     #
-    # *images* is where a widget's pictures go. The store is emptied first and
-    # filled again as the walk reaches each widget, so what is on screen is
-    # what this frame asked for and nothing a previous one left. Without a
-    # store no widget is asked, which is what a terminal that draws no
-    # pictures gets.
+    # *images* is where a widget's pictures go. The whole walk runs inside one
+    # `TermBuf::ImageStore#frame`, so each widget says what it wants on screen
+    # now and the store sends only what is new: a picture asked for again in the
+    # same cells costs no bytes at all, one whose box moved is repositioned
+    # rather than sent again, and one nobody asked for again comes off the
+    # screen. Without a store no widget is asked, which is what a terminal that
+    # draws no pictures gets.
+    #
+    # A placement an application made itself, with `TermBuf::Image#show`, is not
+    # this frame's and is left alone. That is what a background picture behind a
+    # panel is: put up once, and nobody's business afterwards.
     def render(tree : Layout::Tree, screen : Drawing, images : ImageStore? = nil) : Nil
-      images.try &.clear
+      return images.frame { |frame| paint_roots tree, screen, frame } if images
 
+      paint_roots tree, screen, nil
+    end
+
+    private def paint_roots(tree : Layout::Tree, screen : Drawing,
+                            pictures : ImageStore::Frame?) : Nil
       roots = tree.roots_in_z_order
       dimming = dimming_of roots
 
       roots.each_with_index do |root, index|
-        paint root, screen, tree.screen, Style::DEFAULT, true, images, dimming[index]
+        paint root, screen, tree.screen, Style::DEFAULT, true, pictures, dimming[index]
       end
     end
 
@@ -80,7 +91,7 @@ module TermBuf::Widgets
     # coordinates, and *inherited* is the style this widget's own is merged
     # onto.
     private def paint(widget : Widget, screen : Drawing, clip : Rect,
-                      inherited : Style, root : Bool, images : ImageStore?,
+                      inherited : Style, root : Bool, pictures : ImageStore::Frame?,
                       dim : Blend?) : Nil
       return if widget.hidden?
 
@@ -95,13 +106,13 @@ module TermBuf::Widgets
       view.fill box if root || style
       widget.border.try &.draw(view, box)
       widget.draw view.view(inside(widget), effective)
-      images.try { |store| widget.place_images store, widget.frame }
+      pictures.try { |frame| widget.place_images frame, widget.frame }
 
       inner = clip_for widget, clip
       widget.children.each do |child|
         next if child.floating
 
-        paint child, screen, inner, effective, false, images, dim
+        paint child, screen, inner, effective, false, pictures, dim
       end
     end
 

@@ -492,19 +492,19 @@ class DisplayPage < Widgets::Panel
 
   # A small gradient, made here rather than read off disk so the example needs
   # nothing beside it.
-  private def swatch : TermBuf::Image
+  private def swatch : TermBuf::Pixels
     side = 32
-    pixels = Bytes.new side * side * 3
+    bytes = Bytes.new side * side * 3
     side.times do |row|
       side.times do |column|
         at = (row * side + column) * 3
-        pixels[at] = (column * 255 // side).to_u8
-        pixels[at + 1] = (row * 255 // side).to_u8
-        pixels[at + 2] = 160_u8
+        bytes[at] = (column * 255 // side).to_u8
+        bytes[at + 1] = (row * 255 // side).to_u8
+        bytes[at + 2] = 160_u8
       end
     end
 
-    TermBuf::Image.rgb pixels, side, side
+    TermBuf::Pixels.rgb bytes, side, side
   end
 end
 

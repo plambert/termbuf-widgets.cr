@@ -7,7 +7,7 @@ module TermBuf::Widgets
   #
   #     Icon.new "★", fallback: "*"
   #     Icon.new "📁", fallback: "[]"
-  #     Icon.new "●", fallback: "*", image: Image.png(path)
+  #     Icon.new "●", fallback: "*", pixels: Pixels.png(path)
   #
   # ### The fallback
   #
@@ -25,12 +25,14 @@ module TermBuf::Widgets
   #
   # ### With a picture
   #
-  # Given an `#image`, the icon asks for it over its own cells the way
+  # Given `#pixels`, the icon asks for them over its own cells the way
   # `Picture` does, and the glyph is what is left on a terminal that draws no
   # pictures. Nothing branches on whether one does: the glyph goes down every
   # frame and the picture covers it where there is a picture to draw. See
-  # `Picture` for why the question cannot be asked any earlier.
+  # `Picture` for why the question cannot be asked any earlier, and for what
+  # `#pixels` and `#image` are each for.
   class Icon < Readout
+    include Pictured
     # What is drawn.
     layout_property glyph : String = ""
 
@@ -44,10 +46,14 @@ module TermBuf::Widgets
 
     # A picture to put over the glyph, or `nil` for an icon that is only a
     # glyph.
-    property image : Image? = nil
+    getter pixels : Pixels? = nil
 
     # Where that picture sits against the text. See `TermBuf::Placement#z`.
     property z : Int32 = 0
+
+    # Which rectangle of the picture to draw, or `nil` for all of it. See
+    # `TermBuf::Placement#crop`.
+    property crop : Rect? = nil
 
     # How clusters are measured, taken from the tree at every layout.
     getter policy : Unicode::WidthPolicy = Unicode::WidthPolicy::DEFAULT
@@ -55,14 +61,16 @@ module TermBuf::Widgets
     def initialize(@glyph : String = "",
                    fallback : String = "",
                    cells : Int32 = 0,
-                   image : Image? = nil,
+                   pixels : Pixels? = nil,
                    z : Int32 = 0,
+                   crop : Rect? = nil,
                    align : Unicode::Align = Unicode::Align::Left,
                    style : Style? = nil)
       @fallback = fallback
       @cells = cells
-      @image = image
+      @pixels = pixels
       @z = z
+      @crop = crop
       @align = align
       @style = style
       @width = Layout::Sizing.fit
@@ -108,12 +116,19 @@ module TermBuf::Widgets
       Readout.line view, 0, glyph_for(view.policy), @align, @ellipsis
     end
 
-    # Asks for the picture, when there is one, over the glyph.
-    def place_images(store : ImageStore, frame : Rect) : Nil
-      picture = @image
-      return if picture.nil? || frame.empty?
+    # Draws different pixels, and takes the old ones out of the terminal. See
+    # `Picture#pixels=`.
+    def pixels=(value : Pixels?) : Pixels?
+      forget_picture
+      @pixels = value
+    end
 
-      store.place picture, frame, @z
+    # Asks for the picture, when there is one, over the glyph.
+    def place_images(frame : ImageStore::Frame, rect : Rect) : Nil
+      pixels = @pixels
+      return if pixels.nil? || rect.empty?
+
+      frame.show picture_for(frame, pixels), rect, @z, @crop
     end
   end
 end

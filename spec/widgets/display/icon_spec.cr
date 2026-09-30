@@ -73,7 +73,7 @@ Spectator.describe TermBuf::Widgets::Icon do
   describe "a picture over it" do
     it "asks for the picture across its own cells" do
       store = Fixtures.graphical_store
-      mark = Icon.new "*", image: Fixtures.pixels
+      mark = Icon.new "*", pixels: Fixtures.pixels
       Fixtures.painted mark, 6, 1, images: store
 
       expect(store.placements.size).to eq 1
@@ -89,7 +89,7 @@ Spectator.describe TermBuf::Widgets::Icon do
 
     it "draws the glyph either way, since the picture covers it" do
       store = Fixtures.graphical_store
-      mark = Icon.new "*", image: Fixtures.pixels
+      mark = Icon.new "*", pixels: Fixtures.pixels
       buffer = Fixtures.painted mark, 6, 1, images: store
 
       expect(Fixtures.text_of(buffer).first).to eq "*"

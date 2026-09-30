@@ -15,8 +15,18 @@ module Fixtures
   end
 
   # Four red pixels, which is as small as a picture gets.
-  def self.pixels : TermBuf::Image
-    TermBuf::Image.rgb Bytes[255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0], 2, 2
+  def self.pixels : TermBuf::Pixels
+    TermBuf::Pixels.rgb Bytes[255, 0, 0, 255, 0, 0, 255, 0, 0, 255, 0, 0], 2, 2
+  end
+
+  # A larger one, so a spec can ask for part of it.
+  def self.sheet : TermBuf::Pixels
+    TermBuf::Pixels.rgb Bytes.new(8 * 8 * 3, 7_u8), 8, 8
+  end
+
+  # The escape sequences a store has queued, with the cursor moves left out.
+  def self.sequences(store : TermBuf::ImageStore) : Array(String)
+    store.take_pending.select &.starts_with? "\e_G"
   end
 end
 
@@ -80,6 +90,7 @@ Spectator.describe TermBuf::Widgets::Picture do
     it "asks for nothing at all where there is no store" do
       shot = Picture.new Fixtures.pixels, columns: 4, rows: 2
       expect(Fixtures.render(shot, 30, 8)).to be_a Array(String)
+      expect(shot.image).to be_nil
     end
 
     it "sends no bytes to a terminal that draws no pictures" do
@@ -89,6 +100,96 @@ Spectator.describe TermBuf::Widgets::Picture do
 
       expect(store.placements.size).to eq 1
       expect(store.pending?).to be_false
+    end
+  end
+
+  # The pixels are a value the widget can hold before there is a terminal in
+  # sight. The registry entry cannot exist until a frame arrives with a store.
+  describe "the registry entry" do
+    it "is made on the first frame and kept afterwards" do
+      store = Fixtures.graphical_store
+      shot = Picture.new Fixtures.pixels, columns: 4, rows: 2
+
+      expect(shot.image).to be_nil
+      Fixtures.painted shot, 30, 8, images: store
+      first = shot.image
+      expect(first).not_to be_nil
+
+      Fixtures.painted shot, 30, 8, images: store
+      expect(shot.image).to be first
+      expect(store.images.size).to eq 1
+    end
+
+    it "is made again for a store that never saw the picture" do
+      shot = Picture.new Fixtures.pixels, columns: 4, rows: 2
+      Fixtures.painted shot, 30, 8, images: Fixtures.graphical_store
+      first = shot.image
+
+      other = Fixtures.graphical_store
+      Fixtures.painted shot, 30, 8, images: other
+      expect(shot.image).not_to be first
+      expect(other.images.size).to eq 1
+    end
+
+    it "goes when the pixels change, and the old picture goes with it" do
+      store = Fixtures.graphical_store
+      shot = Picture.new Fixtures.pixels, columns: 4, rows: 2
+      Fixtures.painted shot, 30, 8, images: store
+      old = shot.image
+      fail "the first frame registered nothing" unless old
+      store.take_pending
+
+      shot.pixels = Fixtures.sheet
+      expect(shot.image).to be_nil
+      expect(old.forgotten?).to be_true
+      expect(Fixtures.sequences(store).join).to contain "a=d,d=I,i=#{old.id}"
+
+      Fixtures.painted shot, 30, 8, images: store
+      made = shot.image
+      fail "the second frame registered nothing" unless made
+      expect(made.id).to be > old.id
+      expect(Fixtures.sequences(store).count(&.includes? "a=T")).to eq 1
+    end
+
+    it "goes when the picture is taken away" do
+      store = Fixtures.graphical_store
+      shot = Picture.new Fixtures.pixels, columns: 4, rows: 2
+      Fixtures.painted shot, 30, 8, images: store
+
+      shot.pixels = nil
+      Fixtures.painted shot, 30, 8, images: store
+
+      expect(shot.image).to be_nil
+      expect(store.placements).to be_empty
+      expect(store.images).to be_empty
+    end
+  end
+
+  # One image showing a different rectangle of itself in each of several places.
+  describe "#crop" do
+    it "asks for the part of the picture it was given" do
+      store = Fixtures.graphical_store
+      shot = Picture.new Fixtures.sheet, columns: 4, rows: 2,
+        crop: Rect.new(0, 0, 4, 4)
+      Fixtures.painted shot, 30, 8, images: store
+
+      expect(store.placements.first.crop).to eq Rect.new(0, 0, 4, 4)
+      expect(Fixtures.sequences(store).first).to contain "x=0,y=0,w=4,h=4,"
+    end
+
+    it "steps to another part without sending the pixels again" do
+      store = Fixtures.graphical_store
+      shot = Picture.new Fixtures.sheet, columns: 4, rows: 2,
+        crop: Rect.new(0, 0, 4, 4)
+      Fixtures.painted shot, 30, 8, images: store
+      store.take_pending
+
+      shot.crop = Rect.new(4, 4, 4, 4)
+      Fixtures.painted shot, 30, 8, images: store
+
+      sent = Fixtures.sequences store
+      expect(sent.count(&.includes? "a=T")).to eq 0
+      expect(sent.count(&.includes? "x=4,y=4,w=4,h=4,")).to eq 1
     end
   end
 

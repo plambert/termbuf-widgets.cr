@@ -175,7 +175,7 @@ A subclass supplies what the engine cannot work out:
 | `#intrinsic_width(policy)` | a `Layout::Intrinsic`: how narrow the content can go, and what it wants |
 | `#height_for_width(width, policy)` | how many rows it turns out to be once the width is settled |
 | `#draw(view)` | the drawing, through a view already cut to `#content` |
-| `#place_images(store, frame)` | whatever pictures it wants on the screen this frame |
+| `#place_images(frame, rect)` | whatever pictures it wants on the screen this frame |
 | `#cursor_position` | where the terminal's cursor belongs while it has focus, in its own content box |
 | `#focusable?` | whether focus can land here |
 | `#handle(event, context)` | what to do with an event no binding claimed |
@@ -296,6 +296,26 @@ runs first and the dimming last, so what an overlay dims is the style the widget
 The screen is never cleared, because a clear throws away the scroll hints a widget left behind and
 the painter needs those to reach for the terminal's own scrolling region. Each root fills its own
 rectangle instead.
+
+### Pictures
+
+Pictures go the same way as cells: every widget is asked what it wants on screen now, rather than
+tracking what it put there last time. The whole walk runs inside one
+`TermBuf::ImageStore#frame`, so the store sends only what is new — a picture asked for again in the
+same cells costs no bytes at all, one whose box moved is repositioned rather than sent again, and
+one nobody asked for again comes off the screen.
+
+A widget holds `TermBuf::Pixels`, which is a value it can be given before there is a terminal in
+sight. `TermBuf::Image` is an id a terminal has heard of, so one cannot exist until a frame arrives
+with a store in it. `Pictured` is the bookkeeping for that: `#image` is the entry, made on the first
+frame and kept afterwards, and assigning new pixels takes the old picture out of the terminal.
+`Picture`, `Panel` and `Icon` all include it, and an application that wants more of the picture than
+a widget offers — upload it early, show it somewhere else as well — reads `#image` once a frame has
+run.
+
+A placement an application made itself, with `TermBuf::Image#show`, is not a frame's and no frame
+touches it. That is how a background picture behind a panel works: put it up once and stop thinking
+about it.
 
 ## The widgets
 
