@@ -7,6 +7,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- The suite compiles whatever order `crystal spec` globs its files in. It did not: in some orders
+  `DataGrid` failed with `can't infer the type of instance variable '@scroll' of
+  TermBuf::Widgets::DataGrid(String)`, and which orders those were came down to the filesystem, so
+  the same tree built on tmpfs and not on ext4. 0.5.0 has this too.
+
+  `Scrolls` was included on `Table(T)`, and a call on the `Scrolls`-typed `Scrollbar#target` is
+  dispatched over every type that includes the module. Building a `DataGrid(String)` added a member
+  and had the compiler type `Table#scroll_y` for it there and then — before `Table(String)`, the
+  superclass generic instance that nothing in the shard ever names, existed to copy `@scroll`'s
+  declaration from. `DataGrid(T) < Table(T)` is the only generic class here whose superclass is
+  another, which is why it was the only one that broke. Annotating `@scroll` does not help: the
+  compiler asks for the annotation on `DataGrid(String)`, which is not a thing anyone can write.
+
+  `Viewport` is the fix: a non-generic `Widget` that includes `Scrolls`, holds `#scroll`, `#offset`
+  and `#wheel`, and answers `#scroll_x`, `#scroll_y`, `#viewport_size` and `#scroll_by`. `Table(T)`
+  and `VirtualList(T)` are both one of these now and neither includes the module itself. A
+  non-generic class in the module's place has its instance variables settled once, so no order comes
+  into it. Crystal 1.21.1.
+
+### Changed
+
+### Added
 ## [0.5.0] - 2026-09-11
 
 ### Fixed

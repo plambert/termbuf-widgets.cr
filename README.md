@@ -317,7 +317,10 @@ rectangle instead.
 `Rows(T)` is two questions — how many rows there are, and what row *index* is — so a list of a
 hundred thousand costs what a list of twenty does. `Rows.of` wraps an array and `Rows.from` a pair
 of blocks. `Scrolls` is what a `Scrollbar` asks of a window: how much there is, how much is
-showing, and how far in the window sits. Both `Scrollable` and `VirtualList` are one.
+showing, and how far in the window sits. `Scrollable` is one, and so is `Viewport`, the base class
+`VirtualList` and `Table` share: it holds the position and leaves what the window is over to them.
+`Viewport` is where the module is included rather than either widget, and its own documentation says
+why, since the reason is a compiler ordering trap rather than a matter of taste.
 
 `VirtualList#on_draw` is called with the view, the row's index, the row, whether it is the chosen
 one and whether the list has the keyboard. The last two are separate because they are two different

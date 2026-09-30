@@ -1,7 +1,7 @@
 require "../../message"
 require "../../widget"
 require "../rows"
-require "../scrolls"
+require "../viewport"
 
 module TermBuf::Widgets
   # Rows in columns, with a header that stays put while the rows scroll.
@@ -44,9 +44,7 @@ module TermBuf::Widgets
   #
   # Columns wider than the table scroll sideways; `#scroll_by` moves them and
   # `#reveal_column` brings one into view.
-  class Table(T) < Widget
-    include Scrolls
-
+  class Table(T) < Viewport
     # The selection moved to another row.
     struct Selected < Message
       # Which row it is on, from zero.
@@ -129,15 +127,6 @@ module TermBuf::Widgets
 
     # Which row is chosen, from zero.
     getter selected : Int32 = 0
-
-    # The first row showing.
-    getter scroll : Int32 = 0
-
-    # Cells the columns are scrolled left by.
-    getter offset : Int32 = 0
-
-    # How many cells one notch of the wheel moves.
-    property wheel : Int32 = 3
 
     # How clusters are measured, taken from the tree at every layout.
     getter policy : Unicode::WidthPolicy = Unicode::WidthPolicy::DEFAULT
@@ -324,23 +313,6 @@ module TermBuf::Widgets
     # How many rows a page key moves, which is a window's worth.
     def page : Int32
       Math.max viewport_size[1], 1
-    end
-
-    # Cells the columns are scrolled left by.
-    def scroll_x : Int32
-      @offset
-    end
-
-    # The first row showing.
-    def scroll_y : Int32
-      @scroll
-    end
-
-    # Moves the window on either axis, stopping at the ends.
-    def scroll_by(dx : Int32, dy : Int32) : Nil
-      limit = max_scroll
-      @offset = (@offset + dx).clamp 0, limit[0]
-      @scroll = (@scroll + dy).clamp 0, limit[1]
     end
 
     # :ditto:

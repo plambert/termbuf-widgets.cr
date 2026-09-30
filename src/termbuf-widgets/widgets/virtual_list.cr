@@ -1,6 +1,6 @@
 require "../widget"
 require "./rows"
-require "./scrolls"
+require "./viewport"
 
 module TermBuf::Widgets
   # A window over rows, which draws the ones that are showing and no others.
@@ -30,20 +30,12 @@ module TermBuf::Widgets
   # Scrolling and moving the selection change nothing about any rectangle, so
   # neither costs a layout: the next frame draws different rows in the same
   # box.
-  class VirtualList(T) < Widget
-    include Scrolls
-
+  class VirtualList(T) < Viewport
     # Where the rows come from.
     property rows : Rows(T)
 
     # Which row is chosen, from zero.
     getter selected : Int32 = 0
-
-    # The first row showing.
-    getter scroll : Int32 = 0
-
-    # How many cells one notch of the wheel moves.
-    property wheel : Int32 = 3
 
     # What draws one row, or `nil` for the default, which writes what the row
     # answers to `#to_s` and reverses it when it is the chosen one.
@@ -103,12 +95,6 @@ module TermBuf::Widgets
       {content.width, @rows.size}
     end
 
-    # Rows that fit.
-    def viewport_size : {Int32, Int32}
-      box = content
-      {box.width, box.height}
-    end
-
     # How many rows a page key moves, which is a window's worth.
     def page : Int32
       Math.max viewport_size[1], 1
@@ -117,11 +103,6 @@ module TermBuf::Widgets
     # Always nothing: a list does not scroll sideways.
     def scroll_x : Int32
       0
-    end
-
-    # The first row showing, which is the same number of cells down.
-    def scroll_y : Int32
-      @scroll
     end
 
     # The rows that are showing.
@@ -138,7 +119,8 @@ module TermBuf::Widgets
       visible_range.each { |index| yield index, @rows.row(index) }
     end
 
-    # Moves the window, stopping at either end.
+    # Moves the window, stopping at either end. Only rows move: a list does not
+    # scroll sideways.
     def scroll_by(dx : Int32, dy : Int32) : Nil
       scroll_to_row @scroll + dy
     end
