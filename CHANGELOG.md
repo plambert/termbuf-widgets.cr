@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-09-29
+
 ### Changed
 
 - Needs termbuf 0.7, and skips termbuf 0.6 entirely: 0.5.0 of this shard was the last to build
