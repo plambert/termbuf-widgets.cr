@@ -292,4 +292,27 @@ Spectator.describe TermBuf::Widgets::SelectionList do
       expect(list.values).to be_empty
     end
   end
+
+  describe "the scroll margin of its window" do
+    def many(count : Int32) : SelectionList(String)
+      SelectionList.new Option.all(Array.new(count) { |index| "item#{index}" })
+    end
+
+    it "is none, so the selection stays on the last row it can reach" do
+      list = many 20
+      app rooted(list), 20, 8
+      list.highlight 8
+
+      expect(list.list.visible_range).to eq(1...9)
+    end
+
+    it "is the window's, so a margin set there holds the selection off the edge" do
+      list = many 20
+      list.list.scroll_margin = TermBuf::Widgets::Scrolls::Margin.rows(2)
+      app rooted(list), 20, 8
+      list.highlight 8
+
+      expect(list.list.visible_range).to eq(3...11)
+    end
+  end
 end
