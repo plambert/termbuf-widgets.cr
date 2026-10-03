@@ -8,8 +8,15 @@ require "termbuf"
 # for a layout; every widget comes back with a `Rect` in buffer coordinates
 # that it can draw into.
 module TermBuf::Widgets
+  # Windows runs a macro's command with no shell, and its command line quotes
+  # only with double quotes. A Windows path cannot hold a double quote, so
+  # none needs escaping there.
   {% begin %}
-  {% command = "shards version '" + __DIR__.gsub(%r{'}, "'\\''") + "'" %}
+  {% if flag?(:win32) %}
+    {% command = "shards version \"" + __DIR__ + "\"" %}
+  {% else %}
+    {% command = "shards version '" + __DIR__.gsub(%r{'}, "'\\''") + "'" %}
+  {% end %}
   VERSION = {{ `#{command.id}`.strip.stringify }}
   {% end %}
 end

@@ -7,6 +7,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- `VERSION` is read on Windows too. The compiler runs a macro's command there with no shell, so the
+  single quotes around the shard's directory reached `shards` as part of the path, and every build
+  that required this shard stopped there. Windows gets the directory in double quotes, which its
+  command line honours; elsewhere nothing changes.
+
 ## [0.9.0] - 2026-10-04
 
 ### Added
