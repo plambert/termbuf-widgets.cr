@@ -180,6 +180,143 @@ Spectator.describe TermBuf::Widgets::VirtualList do
     end
   end
 
+  describe "the scroll margin" do
+    alias Margin = TermBuf::Widgets::Scrolls::Margin
+
+    # The first row showing after the selection has been moved to each of
+    # *steps* in turn, which is how a key moves it.
+    def tops(made : VirtualList(String), steps : Enumerable(Int32)) : Array(Int32)
+      steps.map do |index|
+        made.select index
+        made.scroll
+      end
+    end
+
+    it "is none until it is asked for" do
+      expect(list(3).scroll_margin).to eq Margin.none
+    end
+
+    it "leaves the selection on the last row when there is none" do
+      made = settle list(30), 6, 10
+      made.select 9
+      expect(made.scroll).to eq 0
+
+      made.select 10
+      expect(made.scroll).to eq 1
+      expect(made.visible_range).to eq(1...11)
+    end
+
+    it "brings the selection back to the first row when there is none" do
+      made = settle list(30), 6, 10
+      made.select 20
+      made.select 15
+      expect(made.scroll).to eq 11
+
+      made.select 10
+      expect(made.scroll).to eq 10
+    end
+
+    it "stops the window two rows before the bottom when moving down" do
+      made = settle list(30), 6, 10
+      made.scroll_margin = Margin.rows(2)
+
+      expect(tops(made, 0..7)).to eq [0] * 8
+      expect(tops(made, 8..11)).to eq [1, 2, 3, 4]
+      expect(made.visible_range).to eq(4...14)
+      expect(made.selected).to eq 11
+    end
+
+    it "stops the window two rows before the top when moving up" do
+      made = settle list(30), 6, 10
+      made.scroll_margin = Margin.rows(2)
+      made.select 25
+      made.select 22
+
+      expect(made.visible_range).to eq(18...28)
+      expect(tops(made, [21, 20, 19])).to eq [18, 18, 17]
+      expect(made.selected).to eq 19
+    end
+
+    it "holds the selection in the middle half with a share of a quarter" do
+      made = settle list(60), 6, 20
+      made.scroll_margin = Margin.share(0.25)
+
+      expect(made.scroll_margin.rows_for(20)).to eq 5
+      (0..40).each do |index|
+        made.select index
+        row = index - made.scroll
+        expect(row).to be < 15
+        expect(row).to be >= Math.min(index, 5)
+      end
+      expect(made.selected - made.scroll).to eq 14
+    end
+
+    it "lets the selection reach the first row, because there is nothing above it" do
+      made = settle list(30), 6, 10
+      made.scroll_margin = Margin.rows(2)
+      made.select 20
+      made.select 0
+
+      expect(made.scroll).to eq 0
+      expect(made.selected).to eq 0
+    end
+
+    it "lets the selection reach the last row, because there is nothing below it" do
+      made = settle list(30), 6, 10
+      made.scroll_margin = Margin.rows(2)
+      made.select 29
+
+      expect(made.scroll).to eq 20
+      expect(made.visible_range).to eq(20...30)
+    end
+
+    it "gives way when the list is shorter than the window needs" do
+      made = settle list(8), 6, 10
+      made.scroll_margin = Margin.share(0.25)
+      made.select 7
+
+      expect(made.scroll).to eq 0
+    end
+
+    it "leaves the window alone when the selection is far enough in" do
+      made = settle list(30), 6, 10
+      made.scroll_margin = Margin.rows(2)
+      made.select 12
+      made.select 13
+
+      expect(made.scroll).to eq 6
+      made.select 8
+      expect(made.scroll).to eq 6
+    end
+
+    it "does not move what scrolls by an amount or to a row" do
+      made = settle list(30), 6, 10
+      made.scroll_margin = Margin.rows(2)
+
+      made.scroll_to_row 12
+      expect(made.scroll).to eq 12
+      made.scroll_by 0, -2
+      expect(made.scroll).to eq 10
+    end
+
+    it "does not move the wheel's idea of the top" do
+      made = settle list(30), 6, 10
+      made.scroll_margin = Margin.share(0.5)
+      made.scroll_wheel TermBuf::Events::Mouse.new(Button::WheelDown, 1, 1,
+        TermBuf::Modifiers::None, Action::Press)
+
+      expect(made.scroll).to eq 3
+    end
+
+    it "gives a window of one row no margin" do
+      made = settle list(10), 6, 1
+      made.scroll_margin = Margin.share(0.5)
+      made.select 4
+
+      expect(made.scroll).to eq 4
+    end
+  end
+
   describe "the keys" do
     def wired(count : Int32, rows : Int32 = 4) : {Fixtures::TestApp, VirtualList(String)}
       made = VirtualList.new Rows.of(Array.new(count) { |index| "r#{index}" })

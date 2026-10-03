@@ -125,6 +125,14 @@ module TermBuf::Widgets
     # What marks a cell cut short.
     property ellipsis : String = "…"
 
+    # How far from either edge of the rows a chosen row is kept when it is
+    # brought into view. None unless asked for.
+    #
+    # It counts rows under the header, because `#viewport_size` does. Only
+    # `#scroll_to` uses it, and so `#select`. `#scroll_by` and the wheel move
+    # the window exactly as far as they are asked to.
+    property scroll_margin : Scrolls::Margin = Scrolls::Margin.none
+
     # Which row is chosen, from zero.
     getter selected : Int32 = 0
 
@@ -320,16 +328,14 @@ module TermBuf::Widgets
       scroll_by dx, dy
     end
 
-    # Moves the window down as little as it takes to show row *index*.
+    # Moves the window down as little as it takes to show row *index*, and to
+    # keep it `#scroll_margin` rows from either edge where the table is long
+    # enough.
     def scroll_to(index : Int32) : Nil
       room = viewport_size[1]
       return if room <= 0
 
-      wanted = @scroll
-      wanted = index - room + 1 if index >= wanted + room
-      wanted = index if index < wanted
-
-      @scroll = wanted.clamp 0, max_scroll[1]
+      @scroll = top_for(index, room, @scroll_margin).clamp 0, max_scroll[1]
     end
 
     # Moves the window across as little as it takes to show column *index*.

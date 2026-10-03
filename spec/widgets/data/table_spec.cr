@@ -237,6 +237,76 @@ Spectator.describe TermBuf::Widgets::Table do
     end
   end
 
+  describe "the scroll margin" do
+    alias Margin = TermBuf::Widgets::Scrolls::Margin
+
+    it "is none until it is asked for" do
+      expect(table.scroll_margin).to eq Margin.none
+    end
+
+    it "leaves the selection on the last row when there is none" do
+      made = settle table(30), 12, 6
+      made.select 4
+      expect(made.scroll).to eq 0
+
+      made.select 5
+      expect(made.scroll).to eq 1
+      expect(made.visible_range).to eq(1...6)
+    end
+
+    it "counts the room under the header, so the bottom margin is the rows it asked for" do
+      made = settle table(30), 12, 6
+      made.scroll_margin = Margin.rows(1)
+      expect(made.viewport_size[1]).to eq 5
+
+      (0..4).each { |index| made.select index }
+      expect(made.scroll).to eq 1
+      expect(made.visible_range).to eq(1...6)
+      expect(Fixtures.render(made, 12, 6)).to eq [
+        "name   n", "row1   4", "row2   4", "row3   4", "row4   4", "row5   4",
+      ]
+    end
+
+    it "keeps rows below the selection on the screen, as many as it asked for" do
+      made = settle table(30), 12, 8
+      made.scroll_margin = Margin.rows(2)
+      (0..12).each { |index| made.select index }
+
+      shown = Fixtures.render(made, 12, 8)
+      expect(shown.size).to eq 8
+      expect(shown.last).to start_with "row#{made.selected + 2}"
+    end
+
+    it "stops two rows before the top when moving up" do
+      made = settle table(30), 12, 8
+      made.scroll_margin = Margin.rows(2)
+      made.select 20
+      made.select 17
+      expect(made.scroll).to eq 15
+
+      made.select 16
+      expect(made.scroll).to eq 14
+    end
+
+    it "lets the selection reach the first and last row" do
+      made = settle table(30), 12, 8
+      made.scroll_margin = Margin.share(0.25)
+      made.select 29
+      expect(made.visible_range).to eq(23...30)
+
+      made.select 0
+      expect(made.scroll).to eq 0
+    end
+
+    it "does not move what scrolls by an amount" do
+      made = settle table(30), 12, 8
+      made.scroll_margin = Margin.rows(2)
+      made.scroll_by 0, 9
+
+      expect(made.scroll).to eq 9
+    end
+  end
+
   describe "the selection" do
     it "moves and stops at either end" do
       made = settle table(5)

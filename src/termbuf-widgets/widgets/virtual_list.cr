@@ -37,6 +37,14 @@ module TermBuf::Widgets
     # Which row is chosen, from zero.
     getter selected : Int32 = 0
 
+    # How far from either edge of the window a row is kept when the selection
+    # is brought into view. None unless asked for, which keeps the selection on
+    # the last row it can reach.
+    #
+    # Only `#scroll_to` uses it, and so `#select`. `#scroll_by`, `#scroll_to_row`
+    # and the wheel put the window exactly where they are asked to.
+    property scroll_margin : Scrolls::Margin = Scrolls::Margin.none
+
     # What draws one row, or `nil` for the default, which writes what the row
     # answers to `#to_s` and reverses it when it is the chosen one.
     #
@@ -135,16 +143,13 @@ module TermBuf::Widgets
       @scroll = index.clamp 0, max_scroll[1]
     end
 
-    # Moves the window as little as it takes to show row *index*.
+    # Moves the window as little as it takes to show row *index*, and to keep
+    # it `#scroll_margin` rows from either edge where the list is long enough.
     def scroll_to(index : Int32) : Nil
       room = viewport_size[1]
       return if room <= 0
 
-      wanted = @scroll
-      wanted = index - room + 1 if index >= wanted + room
-      wanted = index if index < wanted
-
-      scroll_to_row wanted
+      scroll_to_row top_for(index, room, @scroll_margin)
     end
 
     # Chooses row *index*, held inside what there is, and brings it into view.

@@ -14,6 +14,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   that required this shard stopped there. Windows gets the directory in double quotes, which its
   command line honours; elsewhere nothing changes.
 
+## [0.8.0] - 2026-10-02
+
+### Added
+
+- `Scrolls::Margin`, which says how many rows to keep between the selection and the edge of the
+  window: `Margin.none`, `Margin.rows(count)` and `Margin.share(fraction)`. `#rows_for(room)` gives
+  the rows for a window of that height, never more than leaves the selection a row of its own.
+- `VirtualList#scroll_margin` and `Table#scroll_margin` (and so `DataGrid`), `Margin.none` unless
+  set. `#scroll_to` and `#select` keep the selection that far from either edge, except at the ends
+  of the list, where there is nothing further to scroll to. `#scroll_by`, `#scroll_to_row` and the
+  wheel are not affected. A `SelectionList` or `Tree` takes it through its `#list`.
+- `Scrolls#top_for`, the arithmetic both widgets share.
+
 ## [0.7.0] - 2026-09-29
 
 ### Fixed
