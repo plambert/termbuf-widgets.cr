@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-02
+
 ### Added
 
 - `Scrolls::Margin`, which says how many rows to keep between the selection and the edge of the
