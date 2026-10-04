@@ -299,6 +299,16 @@ Spectator.describe Layout::Engine do
       expect(child.rect.width).to eq 10
     end
 
+    it "holds a percent child under its maximum" do
+      root = Box.new
+      child = Box.new
+      child.width = Sizing.percent(80).with_max(5)
+      root.add child
+
+      Layout::Tree.new(root, Rect.full(10, 4)).layout
+      expect(child.rect.width).to eq 5
+    end
+
     it "lets a fixed child overflow along the stacking axis" do
       root = Box.new
       root.direction = Layout::Direction::Row

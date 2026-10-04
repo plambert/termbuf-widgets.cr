@@ -42,6 +42,36 @@ module TermBuf::Widgets::Layout
   # wherever the rounding puts it rather than from whichever child happens to
   # be widest, and a percent is a share of the space its settled siblings left
   # rather than of the whole content box.
+  #
+  # ### Percentage bounds
+  #
+  # A `Sizing` can bound a widget by a percentage of a `Sizing::Basis`, and
+  # each basis becomes known at a different point in the passes:
+  #
+  # | basis | known | bounds the widget in |
+  # | --- | --- | --- |
+  # | `Screen` | before pass 1 | passes 1 and 4, then 2 and 5 |
+  # | `Parent` | pass 2 or 5 | passes 2 and 5 |
+  # | `Component` | pass 2 or 5 | passes 2 and 5 |
+  # | `Component`, no root above | before pass 1 | passes 1 and 4, then 2 and 5 |
+  #
+  # Passes 1 and 4 run bottom up, before any ancestor has a size, so they
+  # apply the cell bounds and the screen and nothing else. Pass 2 and pass 5
+  # apply every bound to each child just before its parent hands out its box,
+  # by which point the parent and every ancestor above it have their size on
+  # that axis.
+  #
+  # That leaves one known limit. A `Fit` widget whose `Parent` or `Component`
+  # cap is below its content reports its full content in pass 1, and is cut
+  # to the cap only in pass 2. If its own parent is also `Fit`, that parent
+  # has already been sized from the full content and comes out too wide. The
+  # space it does not use is left over and aligned like any other. The engine
+  # does not lay the tree out again to close that gap.
+  #
+  # A component root that is itself `Fit` is sized in pass 1 from its
+  # children's uncapped sizes. In pass 2 the widgets under it are bounded by
+  # whatever size it settled on. Nothing is circular about that, because the
+  # root's size is fixed before any of them is bounded against it.
   module Engine
     extend self
 
@@ -54,21 +84,21 @@ module TermBuf::Widgets::Layout
       tree.floats.each { |float| lay_out_float float, tree }
     end
 
-    # The six passes over one subtree, laid into *area*.
+    # The six passes over the tree, laid into *screen*.
     #
-    # The root is given the area it was handed rather than the size its own
-    # `Sizing` asks for: the screen is not negotiable, and a float has had its
-    # size settled by the time it gets here.
-    private def lay_out(root : Widget, policy : Unicode::WidthPolicy, area : Rect) : Nil
-      fit root, policy, Axis::X
-      root.rect = Rect.new area.x, area.y, area.width, root.rect.height
-      distribute root, Axis::X
+    # The root is given the screen rather than the size its own `Sizing` asks
+    # for, because the screen is not negotiable. That includes any percentage
+    # bounds the root carries.
+    private def lay_out(root : Widget, policy : Unicode::WidthPolicy, screen : Rect) : Nil
+      fit root, policy, Axis::X, screen.width
+      root.rect = Rect.new screen.x, screen.y, screen.width, root.rect.height
+      distribute root, Axis::X, screen.width
 
       wrap_text root, policy
 
-      fit root, policy, Axis::Y
-      root.rect = area
-      distribute root, Axis::Y
+      fit root, policy, Axis::Y, screen.height
+      root.rect = screen
+      distribute root, Axis::Y, screen.height
 
       position root
     end
@@ -79,7 +109,8 @@ module TermBuf::Widgets::Layout
     # how big it turned out to be. `Fit` and `Fixed` answer for themselves;
     # `Grow` and `Percent` have no parent box to divide, so they resolve
     # against the anchor target instead, or against the screen when there is
-    # not one.
+    # not one. A `Sizing::Basis::Parent` bound on the float is taken of the
+    # same thing.
     private def lay_out_float(float : Widget, tree : Tree) : Nil
       policy = tree.policy
       screen = tree.screen
@@ -87,17 +118,17 @@ module TermBuf::Widgets::Layout
       return unless floating
 
       reference = anchor_rect floating.anchor, tree
-      fit float, policy, Axis::X
-      width = float_extent float, Axis::X, reference.width
+      fit float, policy, Axis::X, screen.width
+      width = float_extent float, Axis::X, reference.width, screen.width
       float.rect = Rect.new 0, 0, width, float.rect.height
-      distribute float, Axis::X
+      distribute float, Axis::X, screen.width
 
       wrap_text float, policy
-      fit float, policy, Axis::Y
-      height = float_extent float, Axis::Y, reference.height
+      fit float, policy, Axis::Y, screen.height
+      height = float_extent float, Axis::Y, reference.height, screen.height
 
       float.rect = place_float floating, reference, screen, width, height
-      distribute float, Axis::Y
+      distribute float, Axis::Y, screen.height
       position float
     end
 
@@ -112,18 +143,19 @@ module TermBuf::Widgets::Layout
       target.rect
     end
 
-    # How big a float comes out on one axis.
-    private def float_extent(float : Widget, axis : Axis, reference : Int32) : Int32
+    # How big a float comes out on one axis, *reference* being the extent of
+    # what it is anchored to.
+    private def float_extent(float : Widget, axis : Axis, reference : Int32, screen : Int32) : Int32
       sizing = sizing_of float, axis
+      ceiling = tighten float, axis, reference, screen
       value = case sizing.mode
-              in .fixed?   then sizing.min
-              in .fit?     then size_of float, axis
-              in .grow?    then Math.min reference, sizing.max
-              in .percent? then round_share sizing.weight, reference
+              in .fixed?, .fit? then size_of float, axis
+              in .grow?         then Math.min reference, ceiling
+              in .percent?      then round_share sizing.weight, reference
               end
 
       floor = min_of float, axis
-      Math.max value.clamp(floor, Math.max(sizing.max, floor)), 0
+      Math.max value.clamp(floor, Math.max(ceiling, floor)), 0
     end
 
     # Where a float of *width* by *height* lands.
@@ -305,25 +337,103 @@ module TermBuf::Widgets::Layout
     end
 
     # Pass 1 and 4: what each widget would be at, bottom up.
-    private def fit(widget : Widget, policy : Unicode::WidthPolicy, axis : Axis) : Nil
+    #
+    # Only the bounds known before any ancestor has a size apply here. See
+    # `#early_bounds`.
+    private def fit(widget : Widget, policy : Unicode::WidthPolicy, axis : Axis, screen : Int32) : Nil
       if widget.hidden?
         set_size widget, axis, 0
         set_min widget, axis, 0
         return
       end
 
-      widget.children.each { |child| fit child, policy, axis }
+      widget.children.each { |child| fit child, policy, axis, screen }
 
       extent = widget.leaf? ? leaf_extent(widget, policy, axis) : content_extent(widget, axis)
       sizing = sizing_of widget, axis
       spacing = inset_along widget, axis
+      floor, ceiling = early_bounds widget, sizing, screen
 
-      set_min widget, axis, sizing.clamp(extent.min + spacing)
+      set_min widget, axis, (extent.min + spacing).clamp(floor, ceiling)
       set_size widget, axis, case sizing.mode
-      in .fixed?           then sizing.min
-      in .fit?             then sizing.clamp(extent.preferred + spacing)
+      in .fixed?           then sizing.min.clamp(floor, ceiling)
+      in .fit?             then (extent.preferred + spacing).clamp(floor, ceiling)
       in .grow?, .percent? then 0
       end
+    end
+
+    # The bounds pass 1 and 4 can apply: the cells, and the percentages of the
+    # screen. A `Sizing::Basis::Component` bound with no component root above
+    # the widget is a percentage of the screen, so it applies too.
+    private def early_bounds(widget : Widget, sizing : Sizing, screen : Int32) : {Int32, Int32}
+      sizing.bounds do |basis|
+        case basis
+        in .parent?    then nil
+        in .component? then component_root_of(widget) ? nil : screen
+        in .screen?    then screen
+        end
+      end
+    end
+
+    # Every bound on *widget*, *parent* being the extent of the content box it
+    # is laid out in. Only asked once that box and every ancestor above it
+    # have their size on *axis*.
+    private def bounds_of(widget : Widget, axis : Axis, parent : Int32, screen : Int32) : {Int32, Int32}
+      sizing_of(widget, axis).bounds do |basis|
+        case basis
+        in .parent?    then parent
+        in .component? then component_extent widget, axis, screen
+        in .screen?    then screen
+        end
+      end
+    end
+
+    # The ceiling `#bounds_of` answers.
+    private def ceiling_of(widget : Widget, axis : Axis, parent : Int32, screen : Int32) : Int32
+      bounds_of(widget, axis, parent, screen)[1]
+    end
+
+    # Applies the percentage bounds pass 1 and 4 could not, now that the box
+    # *widget* is laid out in is *parent* cells. Raises its floor, and moves a
+    # `Fit` or `Fixed` widget's size inside its bounds, before its parent
+    # hands out the box. Answers the ceiling.
+    #
+    # The bounds pass 1 already applied are no wider than these, so applying
+    # them again changes nothing, and a widget with no percentage bounds is
+    # left alone.
+    private def tighten(widget : Widget, axis : Axis, parent : Int32, screen : Int32) : Int32
+      sizing = sizing_of widget, axis
+      floor, ceiling = bounds_of widget, axis, parent, screen
+      return ceiling unless sizing.percent_bounds?
+
+      set_min widget, axis, min_of(widget, axis).clamp(floor, ceiling)
+      if sizing.fit? || sizing.fixed?
+        set_size widget, axis, size_of(widget, axis).clamp(floor, ceiling)
+      end
+
+      ceiling
+    end
+
+    # The nearest ancestor of *widget* that is a component root, or `nil`.
+    # A float's ancestors are the widgets it sits under in the tree.
+    private def component_root_of(widget : Widget) : Widget?
+      node = widget.parent
+      while node
+        return node if node.component_root?
+
+        node = node.parent
+      end
+
+      nil
+    end
+
+    # The extent of *widget*'s component root's content box, or of the screen
+    # when it has no component root.
+    private def component_extent(widget : Widget, axis : Axis, screen : Int32) : Int32
+      root = component_root_of widget
+      return screen unless root
+
+      Math.max 0, size_of(root, axis) - inset_along(root, axis)
     end
 
     # What a leaf asks for, which on the vertical axis is whatever
@@ -362,28 +472,32 @@ module TermBuf::Widgets::Layout
 
     # Pass 2 and 5: hand each widget's content box out to its children, top
     # down.
-    private def distribute(widget : Widget, axis : Axis) : Nil
+    #
+    # Each child takes on its percentage bounds first, since the box they are
+    # percentages of now has its size.
+    private def distribute(widget : Widget, axis : Axis, screen : Int32) : Nil
       return if widget.hidden?
 
       children = widget.visible_children
       unless children.empty?
         content = Math.max 0, size_of(widget, axis) - inset_along(widget, axis)
+        children.each { |child| tighten child, axis, content, screen }
         if along_axis? widget, axis
-          distribute_along widget, children, content, axis
+          distribute_along widget, children, content, axis, screen
         else
-          distribute_across children, content, axis
+          distribute_across children, content, axis, screen
         end
       end
 
-      widget.children.each { |child| distribute child, axis }
+      widget.children.each { |child| distribute child, axis, screen }
     end
 
     # Along the stacking axis, where the children share one run of cells.
     private def distribute_along(widget : Widget, children : Array(Widget),
-                                 content : Int32, axis : Axis) : Nil
+                                 content : Int32, axis : Axis, screen : Int32) : Nil
       base = Math.max 0, content - gap_total(widget, children.size)
 
-      apply_percent children, percent_base(children, base, axis), axis
+      apply_percent children, percent_base(children, base, axis), axis, content, screen
 
       # A grower has been given nothing yet, but it can never come out below
       # its own minimum, so that much of the box is already spoken for. Count
@@ -402,7 +516,7 @@ module TermBuf::Widgets::Layout
         shrink fitting, base - total_apart_from(children, fitting, axis), axis
       else
         growers = children.select { |child| sizing_of(child, axis).grow? }
-        grow growers, base - total_apart_from(children, growers, axis), axis
+        grow growers, base - total_apart_from(children, growers, axis), axis, content, screen
       end
     end
 
@@ -433,14 +547,15 @@ module TermBuf::Widgets::Layout
 
     # Across the stacking axis, where every child gets the whole content box
     # to place itself in.
-    private def distribute_across(children : Array(Widget), content : Int32, axis : Axis) : Nil
+    private def distribute_across(children : Array(Widget), content : Int32, axis : Axis,
+                                  screen : Int32) : Nil
       children.each do |child|
         sizing = sizing_of child, axis
+        ceiling = ceiling_of child, axis, content, screen
         value = case sizing.mode
-                in .fixed?   then sizing.min
-                in .grow?    then Math.min content, sizing.max
-                in .percent? then round_share(sizing.weight, content)
-                in .fit?     then size_of child, axis
+                in .fixed?, .fit? then size_of child, axis
+                in .grow?         then Math.min content, ceiling
+                in .percent?      then Math.min round_share(sizing.weight, content), ceiling
                 end
 
         # The content box is the ceiling here, not the floor: nothing overflows
@@ -468,26 +583,30 @@ module TermBuf::Widgets::Layout
     end
 
     # Gives every `Percent` child its share of *base*, by the same boundaries
-    # the other two modes use.
-    private def apply_percent(children : Array(Widget), base : Int32, axis : Axis) : Nil
+    # the other two modes use. *content* is the whole box, which is what a
+    # `Sizing::Basis::Parent` bound is taken of.
+    private def apply_percent(children : Array(Widget), base : Int32, axis : Axis,
+                              content : Int32, screen : Int32) : Nil
       shares = children.select { |child| sizing_of(child, axis).percent? }
       return if shares.empty?
 
       slots = shares.map do |child|
         sizing = sizing_of child, axis
-        Slot.new sizing.weight, min_of(child, axis), sizing.max
+        Slot.new sizing.weight, min_of(child, axis), ceiling_of(child, axis, content, screen)
       end
 
       assign shares, share_of(slots, base, 100), axis
     end
 
-    # Divides *target* cells among the growers.
-    private def grow(children : Array(Widget), target : Int32, axis : Axis) : Nil
+    # Divides *target* cells among the growers. *content* is the whole box,
+    # which is what a `Sizing::Basis::Parent` bound is taken of.
+    private def grow(children : Array(Widget), target : Int32, axis : Axis,
+                     content : Int32, screen : Int32) : Nil
       return if children.empty?
 
       slots = children.map do |child|
-        sizing = sizing_of child, axis
-        Slot.new sizing.weight, min_of(child, axis), sizing.max
+        Slot.new sizing_of(child, axis).weight, min_of(child, axis),
+          ceiling_of(child, axis, content, screen)
       end
 
       assign children, apportion(slots, Math.max(0, target)), axis

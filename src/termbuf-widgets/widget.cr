@@ -134,6 +134,19 @@ module TermBuf::Widgets
     # beside it.
     layout_property? hidden : Bool = false
 
+    # Whether this widget is what a `Layout::Sizing::Basis::Component` bound
+    # measures against.
+    #
+    # A widget whose `Layout::Sizing` has a percentage bound `of: :component`
+    # takes it of the content box of the nearest ancestor with this set. With
+    # no such ancestor, it takes it of the screen. A widget is never its own
+    # component root, so setting this on a widget changes the bounds of the
+    # widgets under it and not its own.
+    #
+    # It affects percentage bounds and nothing else. Focus, keys and drawing
+    # take no notice of it.
+    layout_property? component_root : Bool = false
+
     # What the widget draws in, or `nil` to take the surface's own style.
     property style : Style? = nil
 

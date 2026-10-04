@@ -9,6 +9,23 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- `Sizing#with_min_percent` and `Sizing#with_max_percent`, a floor and a ceiling that are a
+  percentage of a `Sizing::Basis`. `Parent`, the default, is the parent's whole content box, which
+  differs from `Sizing.percent`'s share of what the settled siblings left. `Component` is the
+  nearest component root's content box, or the screen when there is none. `Screen` is the whole
+  area the tree is laid out into. Each bound keeps its own basis. They bound every mode on either
+  axis, and intersect with `min` and `max`, the floor winning when the two cross. A fixed size is
+  capped like any other, so `Sizing.fixed(30).with_max_percent(25)` is thirty cells or a quarter
+  of the parent, whichever is smaller.
+- `Parent` and `Component` bounds apply only once the parent hands out its box. A `Fit` widget
+  capped by one of them reports its full content while its parent is measured. A parent that is
+  also `Fit` is sized from that uncapped content and comes out too wide. `Screen` bounds, and
+  `Component` bounds with no component root, apply from the start and do not have this limit.
+- `Sizing#min_percent`, `#max_percent`, `#min_basis`, `#max_basis`, `#percent_bounds?` and
+  `#bounds`, which answers the floor and the ceiling in cells for given bases. `#to_s` shows the
+  percentages.
+- `Widget#component_root?`, false by default. It makes a widget the basis for `Component` bounds on
+  the widgets under it, and affects nothing else.
 - `VirtualList#on_measure`, which answers the text a row shows. With it set, the list is as wide as
   its widest row. The width is measured once and kept until `#rows=`, `#on_measure=`,
   `#measure_limit=` or `#remeasure` is called, or the number of rows changes.
@@ -17,6 +34,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Changed
 
+- `Sizing.percent` across its parent's stacking axis is now held under its `max`. It ignored it
+  before.
 - `VirtualList#rows=` is now a method of its own. With `#on_measure` set it lays the tree out
   again.
 

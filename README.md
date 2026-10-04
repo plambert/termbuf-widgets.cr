@@ -100,6 +100,65 @@ cell twice over and overflowing by one. `Table` resolves its percent columns the
 Each of the four is bounded by its own `#min` and `#max`; `#with_min` and `#with_max` answer a copy
 with one of them changed.
 
+#### Percentage bounds
+
+`#with_min_percent` and `#with_max_percent` add a floor or a ceiling that is a percentage of a
+`Sizing::Basis`. They bound every mode on either axis, the same way `#min` and `#max` do.
+
+```crystal
+Sizing.fit(min: 6).with_max_percent(25)                    # of the parent
+Sizing.fit(min: 6).with_max_percent(25, of: :component)    # of the nearest component root
+Sizing.fit.with_max_percent(20, of: :screen)               # of the terminal
+Sizing.grow.with_min_percent(30).with_max_percent(60)
+```
+
+| Basis | A percentage of |
+| --- | --- |
+| `Parent` (the default) | the parent's whole content box on that axis |
+| `Component` | the content box of the nearest ancestor with `Widget#component_root?` set, or the screen when there is none |
+| `Screen` | the whole area the tree is laid out into |
+
+`Parent` is the parent's whole content box. `Sizing.percent` is a share of what the settled
+siblings left of that box, so the two differ whenever the parent holds anything else. A cap of 25%
+of the parent is a quarter of the parent's content box, whatever its other children take. A float
+has no room in its parent's box, so for a float `Parent` is whatever it is anchored to, or the
+screen. That is also what `Sizing.percent` takes its share of there.
+
+Each bound keeps its own basis, so `with_min_percent(30, of: :screen).with_max_percent(25)` is
+legal. Percentages run from 0 to 100, and anything outside raises `ArgumentError`. Cells and
+percentages intersect. The floor is the larger of `#min` and the minimum percentage, and the
+ceiling the smaller of `#max` and the maximum percentage. When the two cross, the floor wins. A
+fixed sizing's cells are the size it asks for rather than a floor, so `Sizing.fixed(30)` capped at
+25% is thirty cells or a quarter of its basis, whichever is smaller.
+
+`Widget#component_root = true` makes a widget the basis for `Component` bounds on the widgets
+under it. A widget is never its own component root. The lookup goes up through a float to the
+widgets the float sits under. The flag affects percentage bounds and nothing else.
+
+A table column's `Sizing` is resolved by the `Table`, which reads its cells and ignores the
+percentages.
+
+#### When a percentage applies
+
+The engine measures content from the bottom up before any widget has a size, then hands each
+parent's box out to its children from the top down. A basis bounds a widget only once its size is
+known.
+
+| Basis | Bounds the widget |
+| --- | --- |
+| `Screen` | from the start, as a bound in cells does |
+| `Component` with no component root | from the start, since it is the screen |
+| `Parent`, `Component` | once the parent hands out its box |
+
+That leaves one limit. A `Fit` widget capped below its content by `Parent` or `Component` reports
+its full content while its parent is measured, and is cut to the cap afterwards. If the parent is
+also `Fit`, it has already been sized from the uncapped content and comes out too wide. The space
+it does not use is left over and aligned like any other. Size the parent with `grow`, or cap the
+child by the screen, when that matters.
+
+A component root that is itself `Fit` is measured from its children's uncapped sizes, and the
+widgets under it are then capped against the size it settled on.
+
 ### Box model
 
 A widget's `#rect` is the whole claim. Inside it, in order, sit the margin, the border, the padding
