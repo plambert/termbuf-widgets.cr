@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-04
+
 ### Added
 
 - `Sizing#with_min_percent` and `Sizing#with_max_percent`, a floor and a ceiling that are a
