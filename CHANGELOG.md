@@ -7,6 +7,19 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `VirtualList#on_measure`, which answers the text a row shows. With it set, the list is as wide as
+  its widest row. The width is measured once and kept until `#rows=`, `#on_measure=`,
+  `#measure_limit=` or `#remeasure` is called, or the number of rows changes.
+- `VirtualList#measure_limit`, the number of rows measured from the first, a thousand unless set.
+- `VirtualList#remeasure`, for rows changed in place without their number changing.
+
+### Changed
+
+- `VirtualList#rows=` is now a method of its own. With `#on_measure` set it lays the tree out
+  again.
+
 ## [0.8.0] - 2026-10-02
 
 ### Added

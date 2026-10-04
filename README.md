@@ -355,6 +355,22 @@ things to draw: a list that has lost focus still knows where its selection is, a
 lit says the arrows will move it when they will not. `Tree#on_draw` and `SelectionList#on_draw`
 take the same five.
 
+A list draws its rows through `#on_draw`, so the layout sees it as one cell wide.
+`VirtualList#on_measure` answers the text a row shows, and the list is then as wide as its widest
+row, measured under the tree's width policy.
+
+```crystal
+tags = Widgets::VirtualList.new Widgets::Rows.of(pairs), width: Widgets::Layout::Sizing.fit
+tags.on_measure = ->(tag : {String, Int32?}) { "#{tag[0]}  #{tag[1]}" }
+```
+
+Only a list sized `fit` passes that width on to a fitting parent, because a growing child counts
+for nothing while its parent is measured. The list measures once and keeps the answer until
+`#rows=`, `#on_measure=` or `#measure_limit=` is called, or the number of rows changes. Call
+`#remeasure` after changing rows in place. Only the first `#measure_limit` rows are measured, a
+thousand unless set, so a source too large to hold is not read from end to end. A wider row past
+the limit is cut at the edge of the list.
+
 ```crystal
 notes = Widgets::Scrollable.new
 lines.each { |line| notes.add Widgets::Label.new(line) }

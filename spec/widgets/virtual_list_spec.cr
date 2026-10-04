@@ -415,4 +415,173 @@ Spectator.describe TermBuf::Widgets::VirtualList do
       expect(Fixtures.render(made, 8, 2)).to eq ["row 0", "row 1"]
     end
   end
+
+  describe "measuring its width" do
+    let(policy) { TermBuf::Unicode::WidthPolicy::DEFAULT }
+
+    def measured(made : VirtualList(String)) : VirtualList(String)
+      made.on_measure = ->(row : String) { row }
+      made
+    end
+
+    it "is one cell wide without a block to measure with" do
+      expect(list(3).intrinsic_width(policy)).to eq Layout::Intrinsic.new(1, 1)
+    end
+
+    it "asks for no rows without a block to measure with" do
+      source = Counted.new 50
+      VirtualList.new(source).intrinsic_width policy
+
+      expect(source.asked).to eq 0
+    end
+
+    it "prefers the widest row's text" do
+      made = measured VirtualList.new(Rows.of(["ab", "abcdef", "abc"]))
+
+      expect(made.intrinsic_width(policy)).to eq Layout::Intrinsic.new(1, 6)
+    end
+
+    it "measures under the policy it is handed" do
+      made = measured VirtualList.new(Rows.of(["日本", "abc"]))
+
+      expect(made.intrinsic_width(policy).preferred).to eq 4
+    end
+
+    it "measures the text the block answers, not the row" do
+      made = VirtualList.new Rows.of([{"rust", 3}, {"crystal", 12}])
+      made.on_measure = ->(tag : {String, Int32}) { "#{tag[0]}  #{tag[1]}" }
+
+      expect(made.intrinsic_width(policy).preferred).to eq 11
+    end
+
+    it "stays one cell wide when it holds nothing" do
+      made = measured VirtualList.new(Rows.of([] of String))
+
+      expect(made.intrinsic_width(policy)).to eq Layout::Intrinsic.new(1, 1)
+    end
+
+    it "is as wide as its widest row when sized to fit" do
+      made = measured VirtualList.new(Rows.of(["ab", "abcdef"]), width: Sizing.fit)
+      root = Fixtures::Box.new
+      root.add made
+      Layout::Tree.new(root, Rect.full(20, 4)).layout
+
+      expect(made.rect.width).to eq 6
+    end
+
+    it "measures once and keeps the answer" do
+      source = Counted.new 10
+      made = VirtualList.new(source).tap(&.on_measure=(->(row : String) { row }))
+      made.intrinsic_width policy
+      made.intrinsic_width policy
+
+      expect(source.asked).to eq 10
+    end
+
+    it "measures again under a different policy" do
+      source = Counted.new 10
+      made = VirtualList.new(source).tap(&.on_measure=(->(row : String) { row }))
+      made.intrinsic_width policy
+      made.intrinsic_width policy.copy_with(ambiguous: 2)
+
+      expect(source.asked).to eq 20
+    end
+
+    it "measures again when it is given new rows" do
+      made = measured list(2)
+      expect(made.intrinsic_width(policy).preferred).to eq 2
+
+      made.rows = Rows.of ["a much longer row"]
+      expect(made.intrinsic_width(policy).preferred).to eq 17
+    end
+
+    it "measures again when it is given a new block" do
+      made = measured list(2)
+      expect(made.intrinsic_width(policy).preferred).to eq 2
+
+      made.on_measure = ->(row : String) { row * 3 }
+      expect(made.intrinsic_width(policy).preferred).to eq 6
+    end
+
+    it "measures again when the number of rows changes" do
+      items = ["ab"]
+      made = measured VirtualList.new(Rows.of(items))
+      expect(made.intrinsic_width(policy).preferred).to eq 2
+
+      items << "abcd"
+      expect(made.intrinsic_width(policy).preferred).to eq 4
+    end
+
+    it "keeps the old answer for a row changed in place until told" do
+      items = ["ab"]
+      made = measured VirtualList.new(Rows.of(items))
+      made.intrinsic_width policy
+
+      items[0] = "abcd"
+      expect(made.intrinsic_width(policy).preferred).to eq 2
+
+      made.remeasure
+      expect(made.intrinsic_width(policy).preferred).to eq 4
+    end
+
+    it "lays the tree out again when the block changes" do
+      made = list 2
+      tree = Layout::Tree.new made, Rect.full(6, 4)
+      tree.layout
+
+      made.on_measure = ->(row : String) { row }
+      expect(tree.dirty?).to be_true
+    end
+
+    it "lays the tree out again on new rows or a remeasure, once it measures" do
+      made = measured list(2)
+      tree = Layout::Tree.new made, Rect.full(6, 4)
+      tree.layout
+
+      made.rows = Rows.of ["x"]
+      expect(tree.dirty?).to be_true
+      tree.layout
+
+      made.remeasure
+      expect(tree.dirty?).to be_true
+    end
+
+    it "leaves the tree alone on new rows when it does not measure" do
+      made = list 2
+      tree = Layout::Tree.new made, Rect.full(6, 4)
+      tree.layout
+
+      made.rows = Rows.of ["x"]
+      expect(tree.dirty?).to be_false
+    end
+
+    it "measures no more rows than its limit" do
+      source = Counted.new 100_000
+      made = VirtualList.new(source).tap(&.on_measure=(->(row : String) { row }))
+      made.intrinsic_width policy
+
+      expect(made.measure_limit).to eq 1_000
+      expect(source.asked).to eq 1_000
+    end
+
+    it "leaves a wider row past the limit out of the width" do
+      made = measured VirtualList.new(Rows.of(["ab", "abc", "a much longer row"]))
+      made.measure_limit = 2
+
+      expect(made.intrinsic_width(policy).preferred).to eq 3
+    end
+
+    it "measures again when the limit changes" do
+      made = measured VirtualList.new(Rows.of(["ab", "abc", "a much longer row"]))
+      made.measure_limit = 2
+      made.intrinsic_width policy
+
+      made.measure_limit = 3
+      expect(made.intrinsic_width(policy).preferred).to eq 17
+    end
+
+    it "refuses a negative limit" do
+      expect { list(1).measure_limit = -1 }.to raise_error(ArgumentError, /negative/)
+    end
+  end
 end

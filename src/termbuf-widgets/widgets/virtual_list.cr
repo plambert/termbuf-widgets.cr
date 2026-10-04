@@ -30,9 +30,42 @@ module TermBuf::Widgets
   # Scrolling and moving the selection change nothing about any rectangle, so
   # neither costs a layout: the next frame draws different rows in the same
   # box.
+  #
+  # A list draws its rows through `#on_draw`, so it cannot tell how wide a row
+  # is. To the layout it is one cell wide unless it is given `#on_measure`,
+  # which answers the text a row shows.
+  #
+  #     list.width = Layout::Sizing.fit
+  #     list.on_measure = ->(tag : {String, Int32?}) { "#{tag[0]}  #{tag[1]}" }
+  #
+  # The list is then as wide as its widest row, measured under the tree's
+  # width policy. It measures once and keeps the answer until `#rows=`,
+  # `#on_measure=`, `#measure_limit=` or `#remeasure` is called, or the
+  # number of rows changes. Only the first `#measure_limit` rows are
+  # measured.
   class VirtualList(T) < Viewport
     # Where the rows come from.
-    property rows : Rows(T)
+    getter rows : Rows(T)
+
+    # What a row says as text, or `nil` for a list the layout treats as one
+    # cell wide.
+    #
+    # Called with a row, it answers the text the row puts on the screen. The
+    # list measures that text, so the block never needs to know the width
+    # policy. Setting it lays the tree out again.
+    getter on_measure : Proc(T, String)? = nil
+
+    # How many rows, from the first, `#on_measure` is asked about. A thousand
+    # unless set.
+    #
+    # A source too large to hold would otherwise be read from end to end to
+    # measure it. Rows past the limit are not measured, so one wider than all
+    # those before it is cut at the edge of the list.
+    getter measure_limit : Int32 = 1_000
+
+    # The widest row, the number of rows it was measured over, and the policy
+    # it was measured under.
+    @measured : {Int32, Int32, Unicode::WidthPolicy}? = nil
 
     # Which row is chosen, from zero.
     getter selected : Int32 = 0
@@ -68,6 +101,45 @@ module TermBuf::Widgets
       @selected = selected
       @style = style
       @keymap = VirtualList.moves self
+    end
+
+    # Points the list at a different source of rows, and measures again.
+    def rows=(rows : Rows(T)) : Rows(T)
+      @rows = rows
+      remeasure
+      rows
+    end
+
+    # Sets `#on_measure`, forgets what was measured, and lays the tree out
+    # again.
+    def on_measure=(measure : Proc(T, String)?) : Proc(T, String)?
+      @on_measure = measure
+      @measured = nil
+      invalidate_layout
+      measure
+    end
+
+    # Sets `#measure_limit`, and measures again.
+    #
+    # Raises `ArgumentError` when *limit* is negative.
+    def measure_limit=(limit : Int32) : Int32
+      raise ArgumentError.new "measure limit #{limit} is negative" if limit < 0
+
+      @measure_limit = limit
+      remeasure
+      limit
+    end
+
+    # Forgets how wide the rows were, and lays the tree out again so they are
+    # measured afresh.
+    #
+    # Call it when rows change in place without the number of them changing:
+    # an item edited in the array a `Rows.of` holds, or a `Rows.from` block
+    # that now answers something else. A change in the number of rows is
+    # noticed without it. Does nothing without `#on_measure`.
+    def remeasure : Nil
+      @measured = nil
+      invalidate_layout if @on_measure
     end
 
     # The keys that move the selection. A list is given its own copy, so
@@ -171,8 +243,13 @@ module TermBuf::Widgets
       @rows.row @selected
     end
 
+    # One cell, or with `#on_measure` set, one cell at the least and the
+    # widest row it measured at the most.
     def intrinsic_width(policy : Unicode::WidthPolicy) : Layout::Intrinsic
-      Layout::Intrinsic.new 1, 1
+      measure = @on_measure
+      return Layout::Intrinsic.new 1, 1 unless measure
+
+      Layout::Intrinsic.new 1, Math.max(widest_row(measure, policy), 1)
     end
 
     # As tall as it has rows. A list sized to grow never uses this; one sized
@@ -208,6 +285,23 @@ module TermBuf::Widgets
         row = view.view Rect.new(0, index - first, view.width, 1)
         draw_row row, index, item, index == @selected, lit
       end
+    end
+
+    # The widest of the rows `#measure_limit` allows, kept until the rows, the
+    # count or the policy change.
+    private def widest_row(measure : Proc(T, String), policy : Unicode::WidthPolicy) : Int32
+      count = @rows.size
+      if kept = @measured
+        return kept[0] if kept[1] == count && kept[2] == policy
+      end
+
+      widest = 0
+      Math.min(count, @measure_limit).times do |index|
+        widest = Math.max widest, Unicode.string_width(measure.call(@rows.row(index)), policy)
+      end
+
+      @measured = {widest, count, policy}
+      widest
     end
 
     private def draw_row(view : View, index : Int32, item : T, chosen : Bool,
