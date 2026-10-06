@@ -7,6 +7,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-05
+
+### Changed
+
+- Needs termbuf 0.9, which runs on Windows.
+
 ### Fixed
 
 - `VERSION` is read on Windows too. The compiler runs a macro's command there with no shell, so the
