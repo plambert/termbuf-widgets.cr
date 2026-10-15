@@ -1,6 +1,14 @@
 require "../../spec_helper"
 require "./overlay_harness_spec"
 
+# A widget generic over a type from another namespace. It sits in the
+# library's namespace because the widget's instance variable defaults, such
+# as `[] of Widget`, resolve in the namespace a generic subclass is declared in.
+module TermBuf::Widgets
+  class Holder(T) < Fixtures::Box
+  end
+end
+
 Spectator.describe TermBuf::Widgets::HelpOverlay do
   alias Help = TermBuf::Widgets::HelpOverlay
   alias Context = TermBuf::Widgets::Context
@@ -39,6 +47,25 @@ Spectator.describe TermBuf::Widgets::HelpOverlay do
 
       expect(help.rows.select(&.header).map &.keys).to eq ["Box", Help::SCOPE]
       expect(help.rows.first.header).to be_true
+    end
+
+    # A generic's arguments carry namespaces of their own, and the name is not
+    # cut inside them.
+    it "names a generic widget's group with its arguments" do
+      root = Fixtures::MessageLog.new width: TermBuf::Widgets::Layout::Sizing.grow,
+        height: TermBuf::Widgets::Layout::Sizing.grow
+      holder = TermBuf::Widgets::Holder(Fixtures::Box).new
+      holder.focusable = true
+      holder.width = TermBuf::Widgets::Layout::Sizing.grow
+      holder.height = TermBuf::Widgets::Layout::Sizing.grow
+      holder.keymap = keymap_of({"Ctrl+S"}, "do the thing")
+      root.add holder
+      app = Fixtures::TestApp.new root, 40, 12
+      app.frame
+      help = Help.new
+      help.open app
+
+      expect(help.rows.select(&.header).map &.keys).to eq ["Holder(Box)", Help::SCOPE]
     end
 
     it "carries the description each binding was given" do

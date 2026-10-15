@@ -187,10 +187,11 @@ module TermBuf::Widgets
       groups
     end
 
-    # What a widget's group is called: the class without its namespace, which
-    # is what a reader recognises.
+    # What a widget's group is called: the class without its namespaces,
+    # which is what a reader recognises. A generic keeps its arguments, each
+    # without its namespaces too, so `Table(App::Row)` reads `Table(Row)`.
     private def name_of(widget : Widget) : String
-      widget.class.name.split("::").last
+      widget.class.name.gsub(/(?:\w+::)+/, "")
     end
 
     # The first row that is a binding rather than a heading, so the highlight
