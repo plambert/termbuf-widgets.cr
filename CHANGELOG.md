@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-14
+
+### Fixed
+
+- `HelpOverlay` names a generic widget's group in full. It took the class name after its last `::`,
+  which for `Table(App::View::Row)` is inside the type argument, so the heading read `Row)`. It now
+  drops every namespace, the arguments' too, and reads `Table(Row)`. A class that is not generic
+  is named as before.
+
 ## [0.10.0] - 2026-10-05
 
 ### Changed
