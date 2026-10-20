@@ -59,6 +59,35 @@ Spectator.describe TermBuf::Widgets::Form do
       expect(widths).to eq [8, 8]
     end
 
+    it "holds a long label to its share of the width and wraps it" do
+      form = Form.new actions: false
+      form.color "shape", "Shape you cannot make out", TermBuf::Color.rgb(0x3080C0)
+      form.color "wall", "Wall", TermBuf::Color.rgb(0x808080)
+      lines = Fixtures.render rooted(form), 40, 4
+
+      expect(form.rows.map &.caption.rect.width).to eq [16, 16]
+      expect(lines[0]).to start_with "Shape you cannot"
+      expect(lines[0]).to end_with "#3080c0"
+      expect(lines[1]).to eq "make out"
+      expect(lines[2]).to end_with "#808080"
+    end
+
+    it "puts the label column back to the widest label with no share" do
+      form = Form.new actions: false, label_share: nil
+      form.color "shape", "Shape you cannot make out", TermBuf::Color.rgb(0x3080C0)
+      Fixtures.render rooted(form), 40, 2
+
+      expect(form.rows.first.caption.rect.width).to eq 25
+    end
+
+    it "never holds the column below the widest word" do
+      form = Form.new actions: false, label_position: Form::LabelPosition::Left
+      form.toggle "motion", "Animate"
+      Fixtures.render rooted(form), 16, 2
+
+      expect(form.rows.first.caption.rect.width).to eq 7
+    end
+
     it "gives the label column the width it was told to" do
       form = Form.new
       form.label_width = 12
@@ -979,13 +1008,13 @@ Spectator.describe TermBuf::Widgets::Form do
       expect(Fixtures.frame(made)).to eq ["Animate", "☐", "Name", "anon", ""]
     end
 
-    it "stays inside its parent when a label is wider than the form" do
+    it "wraps a label wider than the form and stays inside its parent" do
       form = Form.new actions: false
       form.choice "bars", "Bar color for the panels", %w[gradient bands], value: "bands"
       lines = Fixtures.render rooted(form), 16, 4
 
       expect(form.rect.width).to eq 16
-      expect(lines).to eq ["Bar color for t", "( ) gradient", "(•) bands", ""]
+      expect(lines).to eq ["Bar color for", "the panels", "( ) gradient", "(•) bands"]
     end
 
     it "puts them beside again when it is wide enough" do

@@ -68,8 +68,10 @@ module TermBuf::Widgets
   #
   # A section is a header drawn across the width in `#header_style`, then its
   # rows, with a blank line before the next section. The labels are squared up
-  # to the widest. A form narrower than `#narrow` puts each label above its
-  # input. `#label_position` forces either.
+  # to the widest, held to `#label_share` percent of the width, and a longer
+  # label wraps. `#label_width` sets the column instead. A form narrower than
+  # `#narrow` puts each label above its input. `#label_position` forces
+  # either.
   #
   # The rows scroll in a window with a scrollbar on its right, which draws
   # only while the rows are taller than the window. Under the window, the
@@ -251,6 +253,11 @@ module TermBuf::Widgets
     # a form whose labels hold glyphs the terminal measures differently.
     getter label_width : Int32? = nil
 
+    # The most of a row's width, in percent, that the label column takes
+    # beside the inputs, or `nil` for no limit. Longer labels wrap. Not
+    # applied when `#label_width` is set.
+    layout_property label_share : Int32? = 40
+
     # Rules about the form as a whole, asked with every text at once.
     property rules = [] of Rule
 
@@ -299,6 +306,8 @@ module TermBuf::Widgets
                    help_style : Style = Style::DEFAULT.italic,
                    note_style : Style = Style::DEFAULT.bold,
                    narrow : Int32 = 24,
+                   label_width : Int32? = nil,
+                   label_share : Int32? = 40,
                    depth : Depth = Depth::TrueColor,
                    picker_z : Int32? = nil,
                    width : Layout::Sizing = Layout::Sizing.grow,
@@ -312,6 +321,8 @@ module TermBuf::Widgets
       @help_style = help_style
       @note_style = note_style
       @narrow = narrow
+      @label_width = label_width
+      @label_share = label_share
       @depth = depth
       @picker_z = picker_z
       @width = width
@@ -544,7 +555,15 @@ module TermBuf::Widgets
     # Gives every label the same width, so that the inputs beside them line up.
     private def square_up : Nil
       wanted = @label_width || widest_label
-      rows.each { |row| row.caption.width = Layout::Sizing.fixed wanted }
+      floor = widest_word
+      rows.each &.caption.column(wanted, floor)
+    end
+
+    private def widest_word : Int32
+      rows.max_of? do |row|
+        Layout::TextMeasure.measure(row.label, Unicode::WidthPolicy::DEFAULT)
+          .minimum(Layout::Wrap::Words)
+      end || 0
     end
 
     private def widest_label : Int32

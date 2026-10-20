@@ -62,6 +62,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `height: Layout::Sizing.fit`, or it shrinks to its first row.
 - A `Form` narrower than `#narrow` cells, 24 by default, puts each label above its input.
   `#label_position` is `nil` by default and forces either side when set.
+- A `Form` label column beside the inputs takes at most `#label_share` percent of the width, 40 by
+  default, and never less than the widest word of any label. A longer label wraps onto more lines,
+  and so does a label above its input that is wider than the form. `Form.new` takes
+  `label_share:` and `label_width:`, and `label_share: nil` squares the column to the widest
+  label.
 - `Form.new actions: false` builds a form without the `Submit` and `Cancel` buttons, and without
   submit on `Enter`. `Form#buttons` answers the button group, or `nil`.
 - `Form#values` answers typed values. The text of each row, which `Submitted` carries and the

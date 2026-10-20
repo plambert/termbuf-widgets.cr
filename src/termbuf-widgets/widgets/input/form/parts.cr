@@ -72,6 +72,9 @@ module TermBuf::Widgets
       # The row this pair draws.
       getter row : Row
 
+      # The form the row is in.
+      getter form : Form
+
       def initialize(@form : Form, @row : Row)
         super width: Layout::Sizing.grow
       end
@@ -108,17 +111,57 @@ module TermBuf::Widgets
       end
     end
 
-    # The label of a row, as wide as the label column. A label above its input
-    # in a form narrower than that is cut at the edge rather than widening
-    # the form.
+    # The label of a row, as wide as the label column.
+    #
+    # Beside its input, the column is held to `Form#label_share` percent of
+    # the row unless `Form#label_width` sets it, and never narrower than the
+    # widest word of any label. A label wider than the column wraps onto more
+    # lines. A label above its input in a form narrower than it wraps too,
+    # rather than widening the form.
     class Caption < Label
+      # The widest word of any label in the form, which the column is never
+      # held below.
+      @floor : Int32 = 0
+
       def initialize(text : String)
-        super text, wrap: Layout::Wrap::None
+        super text, wrap: Layout::Wrap::Words
+      end
+
+      # Sets the column to *cells*, held no lower than *floor* by the share.
+      def column(cells : Int32, floor : Int32) : Nil
+        @floor = Math.min floor, cells
+        self.width = Layout::Sizing.fixed cells
+        invalidate_layout
+      end
+
+      def width : Layout::Sizing
+        share = beside_share
+        return @width unless share
+
+        Layout::Sizing.fit(min: @floor, max: @width.max).with_max_percent(share)
+      end
+
+      # Beside its input under a share, the label asks for the whole column,
+      # so every row's label comes out the same width.
+      def intrinsic_width(policy : Unicode::WidthPolicy) : Layout::Intrinsic
+        return super unless beside_share
+
+        Layout::Intrinsic.new @floor, @width.max
       end
 
       # :nodoc:
       def min_size=(min_size : {Int32, Int32}) : {Int32, Int32}
         super({0, min_size[1]})
+      end
+
+      # The share the column is held to, or `nil` when the label is above its
+      # input, the form sets `Form#label_width`, or it has no share.
+      private def beside_share : Int32?
+        pair = parent.as?(Pair)
+        return unless pair && pair.direction.row?
+
+        form = pair.form
+        form.label_share unless form.label_width
       end
     end
 
