@@ -859,4 +859,236 @@ Spectator.describe TermBuf::Widgets::Form do
       ]
     end
   end
+
+  describe "a color row" do
+    alias Color = TermBuf::Color
+    alias Depth = TermBuf::Widgets::Depth
+
+    def colored(depth : Depth = Depth::TrueColor) : Form
+      form = Form.new actions: false, depth: depth
+      form.color "accent", "Accent", Color.rgb(0, 0, 0), help: "The color of the edges."
+      form.toggle "motion", "Animate"
+      form
+    end
+
+    def color_row(form : Form) : Form::ColorRow
+      form.row("accent").as(Form::ColorRow)
+    end
+
+    def attached(form : Form, rows : Int32 = 16) : {Log, Fixtures::TestApp}
+      root = rooted form
+      made = app root, 80, rows
+      form.attach made
+      {root, made}
+    end
+
+    it "shows a swatch with the color's value" do
+      form = Form.new actions: false
+      form.color "accent", "Accent", Color.rgb(0x3080C0)
+
+      expect(Fixtures.render(rooted(form), 30, 1)[0]).to end_with "#3080c0"
+      expect(form["accent"]).to eq Color.rgb(0x3080C0)
+      expect(form.texts["accent"]).to eq "#3080c0"
+    end
+
+    it "opens the picker in a popover on Enter, on the row's color" do
+      form = colored
+      _, made = attached form
+      row = color_row form
+      Fixtures.presses made, "Enter"
+
+      expect(row.open?).to be_true
+      expect(row.popover.try &.open?).to be_true
+      expect(made.focused.same?(row.picker.grid)).to be_true
+      expect(row.picker.value).to eq Color.rgb(0, 0, 0)
+    end
+
+    it "opens it on Space as well" do
+      form = colored
+      _, made = attached form
+      Fixtures.presses made, "Space"
+
+      expect(color_row(form).open?).to be_true
+    end
+
+    it "takes a color with Enter on the grid, closes, and says Changed" do
+      form = colored
+      root, made = attached form
+      row = color_row form
+      Fixtures.presses made, "Enter Right Enter"
+      Fixtures.settle made
+
+      expect(row.open?).to be_false
+      expect(made.focused.same?(row.input)).to be_true
+      expect(form["accent"]).to eq Color.rgb(0, 0, 95)
+      expect(row.input.color).to eq Color.rgb(0, 0, 95)
+      expect(changes root).to eq [{"accent", Color.rgb(0, 0, 95).as(Form::Value)}]
+    end
+
+    it "applies each change while the picker is open" do
+      form = colored
+      root, made = attached form
+      Fixtures.presses made, "Enter Tab Ctrl+U"
+      Fixtures.type made, "200"
+      Fixtures.settle made
+
+      expect(color_row(form).open?).to be_true
+      expect(form["accent"]).to eq Color.rgb(200, 0, 0)
+      expect(changes(root).map &.[1]).to eq [Color.rgb(2, 0, 0), Color.rgb(20, 0, 0),
+                                             Color.rgb(200, 0, 0)]
+    end
+
+    it "leaves the value alone on Escape" do
+      form = colored
+      root, made = attached form
+      row = color_row form
+      Fixtures.presses made, "Enter Right Escape"
+      Fixtures.settle made
+
+      expect(row.open?).to be_false
+      expect(made.focused.same?(row.input)).to be_true
+      expect(form["accent"]).to eq Color.rgb(0, 0, 0)
+      expect(changes root).to be_empty
+    end
+
+    it "puts back the color it opened on when Escape follows a change" do
+      form = colored
+      root, made = attached form
+      Fixtures.presses made, "Enter Right Space"
+      Fixtures.settle made
+      expect(form["accent"]).to eq Color.rgb(0, 0, 95)
+
+      Fixtures.presses made, "Escape"
+      Fixtures.settle made
+      expect(form["accent"]).to eq Color.rgb(0, 0, 0)
+      expect(color_row(form).input.color).to eq Color.rgb(0, 0, 0)
+      expect(changes(root).map &.[1]).to eq [Color.rgb(0, 0, 95), Color.rgb(0, 0, 0)]
+    end
+
+    it "puts back the color with Escape from a field" do
+      form = colored
+      _, made = attached form
+      Fixtures.presses made, "Enter Tab Ctrl+U"
+      Fixtures.type made, "200"
+      Fixtures.presses made, "Escape"
+      Fixtures.settle made
+
+      expect(color_row(form).open?).to be_false
+      expect(form["accent"]).to eq Color.rgb(0, 0, 0)
+    end
+
+    it "keeps the color when a click outside closes the popover" do
+      form = colored
+      _, made = attached form
+      Fixtures.presses made, "Enter Right Space"
+      Fixtures.settle made
+      Fixtures.click made, 79, 15
+      Fixtures.settle made
+
+      expect(color_row(form).open?).to be_false
+      expect(form["accent"]).to eq Color.rgb(0, 0, 95)
+    end
+
+    it "opens in a dialog when the popover fits neither under nor over the row" do
+      form = Form.new actions: false
+      6.times { |index| form.toggle "t#{index}", "Toggle #{index}" }
+      form.color "accent", "Accent", Color.rgb(0, 0, 0)
+      root, made = attached form, 18
+      row = color_row form
+      Fixtures.presses made, "End Enter"
+
+      expect(row.popover.try &.open?).to be_false
+      expect(row.dialog.try &.open?).to be_true
+      expect(made.focused.same?(row.picker.grid)).to be_true
+
+      Fixtures.presses made, "Right Enter"
+      Fixtures.settle made
+      expect(row.open?).to be_false
+      expect(form["accent"]).to eq Color.rgb(0, 0, 95)
+      expect(changes(root).size).to eq 1
+    end
+
+    it "leaves the grid out of a dialog on a short screen, and closes on Enter in a field" do
+      form = colored
+      _, made = attached form, 10
+      row = color_row form
+      Fixtures.presses made, "Enter"
+
+      expect(row.dialog.try &.open?).to be_true
+      expect(row.picker.grid.shown?).to be_false
+      expect(made.focused.same?(row.picker.red)).to be_true
+
+      Fixtures.presses made, "Ctrl+U"
+      Fixtures.type made, "200"
+      Fixtures.presses made, "Enter"
+      Fixtures.settle made
+      expect(row.open?).to be_false
+      expect(form["accent"]).to eq Color.rgb(200, 0, 0)
+    end
+
+    it "closes on Enter in a field and keeps what was typed, held to the range" do
+      form = colored
+      _, made = attached form
+      Fixtures.presses made, "Enter Tab Ctrl+U"
+      Fixtures.type made, "300"
+      Fixtures.presses made, "Enter"
+      Fixtures.settle made
+
+      expect(color_row(form).open?).to be_false
+      expect(form["accent"]).to eq Color.rgb(255, 0, 0)
+    end
+
+    it "closes on Enter in the hex field and keeps the color" do
+      form = colored
+      _, made = attached form
+      Fixtures.presses made, "Enter Tab Tab Tab Tab Ctrl+U"
+      Fixtures.type made, "3080c0"
+      Fixtures.presses made, "Enter"
+      Fixtures.settle made
+
+      expect(color_row(form).open?).to be_false
+      expect(form["accent"]).to eq Color.rgb(0x3080C0)
+    end
+
+    it "keeps the dialog's own message to itself" do
+      form = colored
+      root, made = attached form, 10
+      row = color_row form
+      Fixtures.presses made, "Enter"
+      row.dialog.try &.buttons.first.press
+      Fixtures.settle made
+
+      expect(row.open?).to be_false
+      expect(root.of(TermBuf::Widgets::Dialog::Closed)).to be_empty
+    end
+
+    it "does nothing on Enter until the form is given the application" do
+      form = colored
+      made = app rooted(form), 80, 16
+      Fixtures.presses made, "Enter"
+
+      expect(color_row(form).open?).to be_false
+    end
+
+    it "offers the form's depth unless the row names its own" do
+      form = colored Depth::Indexed256
+      form.color "edge", "Edge", Color.rgb(0x3080C0), depth: Depth::TrueColor
+      row = color_row form
+
+      expect(row.depth).to eq Depth::Indexed256
+      expect(row.input.value_text).to eq "#000000 16"
+      expect(row.picker.depth).to eq Depth::Indexed256
+      expect(form.row("edge").as(Form::ColorRow).depth).to eq Depth::TrueColor
+
+      form.depth = Depth::TrueColor
+      expect(row.input.value_text).to eq "#000000"
+      expect(row.picker.depth).to eq Depth::TrueColor
+    end
+
+    it "refuses a value that is not a color" do
+      form = colored
+
+      expect { form["accent"] = "red" }.to raise_error(ArgumentError)
+    end
+  end
 end

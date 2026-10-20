@@ -110,7 +110,7 @@ module TermBuf::Widgets
     private def draw_beside(view : View, text : String) : Nil
       bar = view.width - text.size - GAP
       draw_bar view, bar
-      view.write bar + GAP, 0, text, @value_style
+      view.write bar + GAP, 0, text, value_style
     end
 
     private def draw_bar(view : View, cells : Int32) : Nil

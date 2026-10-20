@@ -179,21 +179,57 @@ Spectator.describe TermBuf::Widgets::ColorPicker do
                                   Color.rgb(200, 95, 135)]
     end
 
-    it "refuses what is not a digit, and clamps on Enter" do
+    it "stays put while the text is not a number, and puts it back on Enter" do
       picker = ColorPicker.new Color.rgb(0, 0, 0)
-      root = rooted picker
-      made = app root
+      made = app rooted(picker)
       Fixtures.presses made, "Tab Ctrl+U"
-      Fixtures.type made, "2x60"
+      Fixtures.type made, "2x6"
       Fixtures.settle made
 
-      expect(picker.red.text).to eq "260"
+      expect(picker.red.text).to eq "2x6"
+      expect(picker.value).to eq Color.rgb(2, 0, 0)
+
+      Fixtures.presses made, "Enter"
+      expect(picker.red.text).to eq "0"
+      expect(picker.value).to eq Color.rgb(0, 0, 0)
+      expect(made.focused).to be picker.red
+    end
+
+    it "stays put on a number past 255, and clamps it on Enter" do
+      picker = ColorPicker.new Color.rgb(0, 0, 0)
+      made = app rooted(picker)
+      Fixtures.presses made, "Tab Ctrl+U"
+      Fixtures.type made, "260"
+      Fixtures.settle made
+
       expect(picker.value).to eq Color.rgb(26, 0, 0)
 
       Fixtures.presses made, "Enter"
       expect(picker.red.text).to eq "255"
       expect(picker.value).to eq Color.rgb(255, 0, 0)
-      expect(made.focused).to be picker.red
+    end
+
+    it "steps from what is typed" do
+      picker = ColorPicker.new Color.rgb(0, 0, 0)
+      made = app rooted(picker)
+      Fixtures.presses made, "Tab Ctrl+U"
+      Fixtures.type made, "40"
+      Fixtures.presses made, "Up"
+
+      expect(picker.value).to eq Color.rgb(41, 0, 0)
+      expect(picker.red.text).to eq "41"
+    end
+
+    it "writes the field back from the value on Escape" do
+      picker = ColorPicker.new Color.rgb(0, 0, 0)
+      made = app rooted(picker)
+      Fixtures.presses made, "Tab Ctrl+U"
+      Fixtures.type made, "200"
+      Fixtures.presses made, "Escape"
+      Fixtures.settle made
+
+      expect(picker.value).to eq Color.rgb(200, 0, 0)
+      expect(picker.red.text).to eq "200"
     end
 
     it "puts an empty channel back to its value on Enter" do
