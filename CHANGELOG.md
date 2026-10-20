@@ -24,7 +24,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   change applies at once and emits `Form::Changed`. `Enter` closes the picker and keeps the color,
   and `Escape` closes it and puts back the color it opened on. `Form.new depth:` sets the `Depth`
   for every color row, and `depth:` on the row overrides it. A form with color rows needs
-  `Form#attach app`.
+  `Form#attach app`. The picker opens above every overlay the form sits in. `Form.new picker_z:`
+  and `picker_z:` on the row set the z it opens at instead.
 - `Form#values` answers every row's value by key as a `Form::Value`. `form["key"]` reads one and
   `form["key"] = value` sets it and sends nothing. `Form::Changed` carries the key and the value of
   every change a person makes. An action row holds no value and emits `Form::Activated` with its
@@ -47,6 +48,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the grid adds the 16 system colors, and a field edit snaps to the nearest index. `#reset_to`
   adds a "default" cell. Each change emits `ColorPicker::Changed`.
 - `examples/color.cr`, a picker with two swatches that follow it.
+- `Overlay#z=` moves an overlay to another z, open or not, and moves its catcher with it.
 
 ### Changed
 
@@ -60,6 +62,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `height: Layout::Sizing.fit`, or it shrinks to its first row.
 - A `Form` narrower than `#narrow` cells, 24 by default, puts each label above its input.
   `#label_position` is `nil` by default and forces either side when set.
+- A `Form` label column beside the inputs takes at most `#label_share` percent of the width, 40 by
+  default, and never less than the widest word of any label. A longer label wraps onto more lines,
+  and so does a label above its input that is wider than the form. `Form.new` takes
+  `label_share:` and `label_width:`, and `label_share: nil` squares the column to the widest
+  label.
 - `Form.new actions: false` builds a form without the `Submit` and `Cancel` buttons, and without
   submit on `Enter`. `Form#buttons` answers the button group, or `nil`.
 - `Form#values` answers typed values. The text of each row, which `Submitted` carries and the
