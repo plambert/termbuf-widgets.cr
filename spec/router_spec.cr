@@ -265,18 +265,31 @@ Spectator.describe TermBuf::Widgets::Router do
       expect(leaf.seen).to be_empty
     end
 
-    it "leaves a message emitted while draining for the drain after" do
-      router, _, _, panel, leaf = nested
+    it "delivers a message emitted while draining in the same drain" do
+      router, _, root, panel, leaf = nested
       panel.on_handle = ->(event : TermBuf::Event, _context : Context) do
-        panel.emit Fixtures::Said.new("again") if event.is_a? Fixtures::Said
+        if event.is_a?(Fixtures::Said) && event.what == "hello"
+          panel.emit Fixtures::Said.new("again")
+        end
         nil
       end
 
       leaf.emit Fixtures::Said.new("hello")
-      expect(router.drain).to eq 1
-      expect(router.pending.size).to eq 1
-      expect(router.drain).to eq 1
+      expect(router.drain).to eq 2
       expect(router.pending).to be_empty
+      expect(root.seen.compact_map(&.as?(Fixtures::Said)).map(&.what)).to eq %w[hello again]
+    end
+
+    it "stops a pair answering each other after a bounded number of passes" do
+      router, _, _, panel, leaf = nested
+      panel.on_handle = ->(event : TermBuf::Event, _context : Context) do
+        leaf.emit Fixtures::Said.new("again") if event.is_a? Fixtures::Said
+        nil
+      end
+
+      leaf.emit Fixtures::Said.new("hello")
+      expect(router.drain).to eq Router::PASSES
+      expect(router.pending.size).to eq 1
     end
 
     it "goes nowhere for a widget outside a tree" do

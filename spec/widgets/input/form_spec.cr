@@ -461,6 +461,27 @@ Spectator.describe TermBuf::Widgets::Form do
     end
   end
 
+  describe "a change" do
+    it "is heard in the same pump as the key that made it" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.press made, "Space"
+
+      expect(changes root).to eq [{"motion", false}] of {String, Form::Value}
+    end
+
+    it "is heard in the same wait as the key that made it" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      made.events.send TermBuf::Events::Key.new(TermBuf::Key.parse_one("Space"), Bytes.empty)
+      made.wait
+
+      expect(changes root).to eq [{"motion", false}] of {String, Form::Value}
+    end
+  end
+
   describe "each kind" do
     it "toggles on Space and says so" do
       form = settings

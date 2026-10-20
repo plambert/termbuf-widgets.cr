@@ -58,6 +58,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Form#values` answers typed values. The text of each row, which `Submitted` carries and the
   form's `#rules` are asked about, is `Form#texts`.
 - `Form#add` takes an optional `help`.
+- `Router#drain` delivers the messages its own handlers emit in the same drain, for up to
+  `Router::PASSES` rounds, and `App#pump` drains again after the events it takes. A widget that
+  answers another's message, such as `Form` sending `Form::Changed`, is heard on the same key.
 
 ## [0.11.0] - 2026-10-20
 
