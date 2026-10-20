@@ -72,9 +72,11 @@ module TermBuf::Widgets
   # input. `#label_position` forces either.
   #
   # The rows scroll in a window with a scrollbar on its right, which draws
-  # only while the rows are taller than the window. Under the window, a line
-  # shows the help and the note of the row with the keyboard. That line is
-  # left out of a form where no row has either.
+  # only while the rows are taller than the window. Under the window, the
+  # help and the note of the row with the keyboard are wrapped to the width.
+  # They take as many rows as the longest help and note of any row, so the
+  # window stays put as the keyboard moves. They are left out of a form
+  # where no row has either.
   #
   # A form is `Layout::Sizing.grow` tall by default, as every scrolling
   # widget in this shard is, so it takes the room its parent has left. A
@@ -528,15 +530,14 @@ module TermBuf::Widgets
       end || 0
     end
 
-    # Shows the help line when any row has help or a note, with a second line
-    # when any has a note.
+    # Shows the help line when any row has help or a note, and lays it out
+    # again for the text it now holds.
     #
     # :nodoc:
     def refresh_help : Nil
       all = rows
-      noted = all.any? &.note
-      @help_line.height = Layout::Sizing.fixed(noted ? 2 : 1)
-      @help_line.hidden = !noted && all.none?(&.help)
+      @help_line.hidden = all.none?(&.note) && all.none?(&.help)
+      @help_line.invalidate_layout
     end
 
     # *widget* if the keyboard can land on it, and otherwise the first thing

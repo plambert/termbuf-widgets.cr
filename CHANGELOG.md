@@ -50,8 +50,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - `Form` puts its rows in a scrolling window with a scrollbar, and the help of the row with the
-  keyboard on a line under it. `Up`, `Down`, `Home`, `End`, `PageUp` and `PageDown` move between
-  rows, and `Tab` brings the row it lands on into view. A click on a label presses the row.
+  keyboard under it, wrapped to the width. The help takes as many rows as the longest help of any
+  row, so the window does not move with the keyboard. `Up`, `Down`, `Home`, `End`, `PageUp` and
+  `PageDown` move between rows, and `Tab` brings the row it lands on into view. A click on a label
+  presses the row.
 - `Form` is `Layout::Sizing.grow` tall by default. Its window is as tall as the rows when there
   is room and scrolls when there is not. A form inside a parent sized to fit needs
   `height: Layout::Sizing.fit`, or it shrinks to its first row.

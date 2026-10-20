@@ -756,6 +756,28 @@ Spectator.describe TermBuf::Widgets::Form do
       expect(Fixtures.frame(made)[8..9]).to eq ["Panels slide.", "Set by the server."]
     end
 
+    it "wraps a help line wider than the form onto the rows under it" do
+      form = Form.new actions: false, label_position: Form::LabelPosition::Left
+      form.toggle "motion", "Animate", help: "Panels slide and fade. Off draws the end state."
+      form.toggle "mouse", "Mouse", help: "Reports clicks."
+      form.note "motion", "Set by the server for this run."
+      made = app rooted(form), 20, 8
+
+      expect(Fixtures.frame(made)).to eq [
+        "Animate ☐",
+        "Mouse   ☐",
+        "Panels slide and",
+        "fade. Off draws the",
+        "end state.",
+        "Set by the server",
+        "for this run.",
+        "",
+      ]
+
+      Fixtures.presses made, "Down"
+      expect(Fixtures.frame(made)[0..3]).to eq ["Animate ☐", "Mouse   ☐", "Reports clicks.", ""]
+    end
+
     it "leaves the help line out when no row has help" do
       form = Form.new actions: false
       form.toggle "one", "One"
