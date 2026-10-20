@@ -112,6 +112,10 @@ module TermBuf::Widgets
     # The picker opens over the screen, so the form has to be given the
     # application with `Form#attach` first. Until then the row does nothing
     # when pressed.
+    #
+    # The picker opens above every overlay the form sits in. A form in no
+    # overlay opens it at `Overlay::Z::POPOVER`, or `Overlay::Z::DIALOG` for
+    # the dialog. `#picker_z` on the row or `Form#picker_z` sets the z instead.
     class ColorRow < Row
       # The button the dialog closes with.
       DONE = "Done"
@@ -129,13 +133,18 @@ module TermBuf::Widgets
 
       @value : Color
       @depth : Depth?
+      # The z the picker opens at, or `nil` to take `Form#picker_z` or to
+      # open above the overlays the form sits in.
+      property picker_z : Int32? = nil
+
       @picker : ColorPicker? = nil
       @popover_box : PickerBox? = nil
       @dialog_box : PickerBox? = nil
 
       def initialize(key : String, label : String, value : Color, depth : Depth? = nil,
-                     help : String? = nil)
+                     help : String? = nil, picker_z : Int32? = nil)
         super key, label, help
+        @picker_z = picker_z
         @value = value
         @before = value
         @depth = depth
@@ -239,6 +248,7 @@ module TermBuf::Widgets
 
         popover = @popover || build_popover(form)
         (@popover_box ||= PickerBox.new(self)).hold held
+        popover.z = z_over form, Overlay::Z::POPOVER
         popover.open app
         app.tree.layout
         return if clear_of_row? popover.rect
@@ -246,7 +256,19 @@ module TermBuf::Widgets
         popover.close
         dialog = @dialog || build_dialog(form)
         dialog_box.hold held
+        dialog.z = z_over form, Overlay::Z::DIALOG
         dialog.open app
+      end
+
+      # Where the picker opens. Two above the highest overlay holding *form*,
+      # so that its catcher is above that overlay too, and never below
+      # *least*.
+      private def z_over(form : Form, least : Int32) : Int32
+        chosen = @picker_z || form.picker_z
+        return chosen if chosen
+
+        host = form.overlay_z
+        host ? Math.max(least, host + 2) : least
       end
 
       # Closes the picker and keeps the color.

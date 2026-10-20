@@ -1082,6 +1082,72 @@ Spectator.describe TermBuf::Widgets::Form do
       {root, made}
     end
 
+    # *form* in a dialog at *z*, open on a screen of *rows*.
+    def hosted(form : Form, z : Int32, rows : Int32 = 30) : Fixtures::TestApp
+      root = Log.new width: Sizing.grow, height: Sizing.grow
+      made = app root, 80, rows
+      host = TermBuf::Widgets::Dialog.new "host", body: form, z: z, width: Sizing.fixed(60)
+      host.open made
+      form.attach made
+      made.frame
+      made
+    end
+
+    # The z *overlay* is at, and the z its catcher is at, or zero for either
+    # that is missing.
+    def zs(overlay : TermBuf::Widgets::Overlay?) : {Int32, Int32}
+      catcher = overlay.try(&.catcher).try(&.floating).try(&.z)
+      {overlay.try(&.z) || 0, catcher || 0}
+    end
+
+    it "opens the popover above the overlay the form sits in" do
+      form = colored
+      hosted form, 150
+      row = color_row form
+      row.open
+      z, under = zs row.popover
+
+      expect(row.popover.try &.open?).to be_true
+      expect(z).to be > 150
+      expect(under).to be >= 150
+    end
+
+    it "opens the dialog above the overlay the form sits in" do
+      form = colored
+      hosted form, 350, 12
+      row = color_row form
+      row.open
+      z, under = zs row.dialog
+
+      expect(row.dialog.try &.open?).to be_true
+      expect(z).to be > 350
+      expect(under).to be >= 350
+    end
+
+    it "keeps the default z for a form in no overlay" do
+      form = colored
+      attached form
+      row = color_row form
+      row.open
+
+      expect(row.popover.try &.z).to eq TermBuf::Widgets::Overlay::Z::POPOVER
+    end
+
+    it "opens at the z the form or the row names" do
+      form = Form.new actions: false, picker_z: 500
+      form.color "accent", "Accent", Color.rgb(0, 0, 0)
+      form.color "edge", "Edge", Color.rgb(0, 0, 0), picker_z: 600
+      hosted form, 150
+      accent = form.row("accent").as(Form::ColorRow)
+      accent.open
+      expect(accent.popover.try &.z).to eq 500
+
+      accent.close
+      edge = form.row("edge").as(Form::ColorRow)
+      edge.open
+      expect(edge.popover.try &.z).to eq 600
+    end
+
     it "shows a swatch with the color's value" do
       form = Form.new actions: false
       form.color "accent", "Accent", Color.rgb(0x3080C0)

@@ -278,6 +278,10 @@ module TermBuf::Widgets
     # How many colors a color row offers unless it names its own depth.
     getter depth : Depth
 
+    # The z a color row's picker opens at unless the row names its own, or
+    # `nil` to open it above the overlays the form sits in.
+    property picker_z : Int32?
+
     # What a widget the form does not otherwise know contributes as text, or
     # `nil` for one that contributes nothing. Set this to take in a widget of
     # your own.
@@ -296,6 +300,7 @@ module TermBuf::Widgets
                    note_style : Style = Style::DEFAULT.bold,
                    narrow : Int32 = 24,
                    depth : Depth = Depth::TrueColor,
+                   picker_z : Int32? = nil,
                    width : Layout::Sizing = Layout::Sizing.grow,
                    height : Layout::Sizing = Layout::Sizing.grow,
                    style : Style? = nil)
@@ -308,6 +313,7 @@ module TermBuf::Widgets
       @note_style = note_style
       @narrow = narrow
       @depth = depth
+      @picker_z = picker_z
       @width = width
       @height = height
       @style = style
@@ -497,6 +503,21 @@ module TermBuf::Widgets
         width = @rect.width
         width > 0 && width < @narrow
       end
+    end
+
+    # The highest z of the overlays the form sits in, or `nil` for a form in
+    # none.
+    def overlay_z : Int32?
+      found : Int32? = nil
+      holder = parent
+      while holder
+        if holder.is_a? Overlay
+          z = holder.z
+          found = z if found.nil? || z > found
+        end
+        holder = holder.parent
+      end
+      found
     end
 
     # Lays the window out again from the sections.

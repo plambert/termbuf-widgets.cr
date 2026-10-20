@@ -47,8 +47,8 @@ module TermBuf::Widgets
       # `ColorPicker` on it. *depth* is how many colors the picker offers, or
       # `nil` for the form's `Form#depth`.
       def color(key : String, label : String, value : Color, help : String? = nil,
-                depth : Depth? = nil) : ColorRow
-        add_row(ColorRow.new(key, label, value, depth, help)).as(ColorRow)
+                depth : Depth? = nil, picker_z : Int32? = nil) : ColorRow
+        add_row(ColorRow.new(key, label, value, depth, help, picker_z)).as(ColorRow)
       end
 
       # A row that is a thing to do. Pressing it emits `Form::Activated`.

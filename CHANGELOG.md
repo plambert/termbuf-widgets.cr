@@ -24,7 +24,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   change applies at once and emits `Form::Changed`. `Enter` closes the picker and keeps the color,
   and `Escape` closes it and puts back the color it opened on. `Form.new depth:` sets the `Depth`
   for every color row, and `depth:` on the row overrides it. A form with color rows needs
-  `Form#attach app`.
+  `Form#attach app`. The picker opens above every overlay the form sits in. `Form.new picker_z:`
+  and `picker_z:` on the row set the z it opens at instead.
 - `Form#values` answers every row's value by key as a `Form::Value`. `form["key"]` reads one and
   `form["key"] = value` sets it and sends nothing. `Form::Changed` carries the key and the value of
   every change a person makes. An action row holds no value and emits `Form::Activated` with its
