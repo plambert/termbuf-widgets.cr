@@ -493,6 +493,50 @@ Spectator.describe TermBuf::Widgets::Form do
       expect(Fixtures.frame(made)[1]).to eq "Animate ☐"
     end
 
+    it "toggles on Enter as it does on Space" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.presses made, "Enter"
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to eq [{"motion", false}, {"motion", true}]
+    end
+
+    it "moves a choice on one on Enter, from the last back to the first" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.presses made, "Down"
+      Fixtures.presses made, "Enter"
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to eq [{"bars", "bands"}, {"bars", "gradient"}]
+    end
+
+    it "toggles on Enter in a form with buttons rather than submitting" do
+      form = Form.new
+      form.toggle "wrap", "Wrap", value: true
+      form.add "name", Field.new
+      root = rooted form
+      made = app root
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to eq [{"wrap", false}] of {String, Form::Value}
+      expect(root.of(Form::Submitted)).to be_empty
+    end
+
+    it "leaves Enter on a text row to the field" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to be_empty
+      expect(form["name"]).to eq "anon"
+    end
+
     it "moves an inline choice on Left and Right and says so" do
       form = settings
       root = rooted form

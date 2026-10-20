@@ -32,6 +32,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Form#typing?` says whether the row with the keyboard takes free text, and `Form#types?` whether
   it takes a given key. `Form#type` hands the key being answered to that row and says whether it
   did, for a host that binds letters around the form.
+- `Enter` on a toggle row toggles it and `Enter` on a choice row moves it on one, as `Space` does.
 - `Form#enable` dims a row and takes it out of the keyboard's path. `Form#note` adds a line under
   the row's help, for a value forced from elsewhere.
 - `examples/form.cr`, a settings form with every row kind beside a dialog form with buttons.

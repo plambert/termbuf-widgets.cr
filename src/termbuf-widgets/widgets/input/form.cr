@@ -88,7 +88,9 @@ module TermBuf::Widgets
   #
   # ### Keys
   #
-  # `Up` and `Down` move between rows and stop at the ends. `Tab` and
+  # `Space` and `Enter` toggle a toggle row and move a choice row on one.
+  # `Enter` and `Space` press an action row. `Up` and `Down` move between
+  # rows and stop at the ends. `Tab` and
   # `Shift+Tab` move through the focus ring. `Home` and `End` go to the first
   # and last row, except on a text row, where they move the cursor, and on a
   # number row, where they go to the ends of its range. `PageUp` and
@@ -900,10 +902,12 @@ module TermBuf::Widgets
 
     # ------------------------------------------------------------- events
 
-    # Takes a button press, a line handed over by a field, and the messages
-    # that mean a row changed.
+    # Takes `Enter` on a row whose widget left it alone, a button press, a
+    # line handed over by a field, and the messages that mean a row changed.
     def handle(event : Event, context : Context) : Nil
       case event
+      when Events::Key
+        entered_row event, context
       when Button::Pressed
         pressed event, context
       when Field::Accepted
@@ -916,6 +920,15 @@ module TermBuf::Widgets
       else
         changed event, context
       end
+    end
+
+    # `Enter` on a toggle or a choice row does what `Space` does there.
+    private def entered_row(event : Events::Key, context : Context) : Nil
+      return unless event.key.is? Key::Name::Enter
+      return unless event.key.modifiers.none?
+
+      row = focused_row
+      context.consume if row && row.enter
     end
 
     private def pressed(event : Button::Pressed, context : Context) : Nil
