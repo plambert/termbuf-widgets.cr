@@ -19,6 +19,8 @@ module TermBuf::Widgets
   #
   # Every step that moves the value and every accept emits `Changed` with the
   # value. Setting `#value` from the application draws it and sends nothing.
+  # Any text can be typed. `#typing` hears each edit as it happens, before
+  # `Enter` decides whether it is a number.
   #
   # With `#bar` on, a filled bar beside the number shows where the value sits
   # in the range. The bar only draws. It takes no keys of its own.
@@ -72,6 +74,11 @@ module TermBuf::Widgets
 
     # What draws the bar. Set its styles to color it.
     getter meter : ProgressBar
+
+    # Called after every edit that changes the text, with the text as a whole
+    # number in the range, or `nil` when it is not one. The value itself only
+    # moves on a step or on `Enter`.
+    property typing : Proc(Int32?, Nil)? = nil
 
     def initialize(value : Int32 = 0,
                    range : Range(Int32, Int32) = 0..100,
@@ -173,13 +180,21 @@ module TermBuf::Widgets
       text.strip.to_i32?
     end
 
+    # The typed text as an integer in the range, or `nil` when it is not one.
+    def typed_in_range : Int32?
+      found = typed
+      found if found && @range.includes?(found)
+    end
+
     # Does what *key* means to the editor, keeping the line in the field when
     # it is accepted.
     def press(key : Key) : Nil
       return if @disabled
 
+      before = text
       outcome = @editor.handle key
       invalidate_layout
+      edited before if outcome.continue?
 
       case outcome
       in .continue? then nil
@@ -195,7 +210,17 @@ module TermBuf::Widgets
 
     # Takes nothing while disabled.
     def paste(text : String) : Nil
-      super unless @disabled
+      return if @disabled
+
+      before = self.text
+      super
+      edited before
+    end
+
+    private def edited(before : String) : Nil
+      return if text == before
+
+      @typing.try &.call(typed_in_range)
     end
 
     private def show_value : Nil
