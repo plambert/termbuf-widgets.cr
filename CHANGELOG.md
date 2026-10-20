@@ -7,6 +7,15 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-20
+
+This release needs termbuf 0.10, which reports the mouse in pixels where the terminal can.
+
+### Changed
+
+- Hit testing is unchanged and in cells. `Events::Mouse#pixel` reaches handlers untouched, for a
+  widget that wants a position inside the cell.
+
 ## [0.10.1] - 2026-10-14
 
 ### Fixed

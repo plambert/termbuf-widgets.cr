@@ -300,7 +300,9 @@ What a widget and a focus scope each carry is `Bindings`, which is `Keymap(Actio
 `Router` decides where an event goes. A key goes to whatever has the keyboard, an event including
 `Positioned` — a mouse event is one — to whatever `Layout::Tree#hit` finds under the point, and a
 message to whatever contains the widget that sent it. From there it walks up through the parents
-until something claims it or it reaches the top scope's root.
+until something claims it or it reaches the top scope's root. The point is always a cell; a widget
+that wants finer than that reads `event.pixel`, which termbuf fills in on a terminal that reports
+pixels and leaves nil elsewhere.
 
 Bindings come first, all of them at once: the chain's keymaps go to one `Keymap::Matcher`,
 innermost first, because a multi-key binding is only a sequence if the same matcher sees every key
