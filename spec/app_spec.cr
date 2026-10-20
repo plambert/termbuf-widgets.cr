@@ -151,7 +151,7 @@ Spectator.describe TermBuf::Widgets::App do
   end
 
   describe "messages" do
-    it "delivers one emitted by a handler on the next pump" do
+    it "delivers one emitted by a handler in the same pump" do
       root = Box.new
       leaf = Box.sized 2, 1
       leaf.focusable = true
@@ -166,9 +166,6 @@ Spectator.describe TermBuf::Widgets::App do
       end
 
       Fixtures.press app, "a"
-      expect(root.seen.map(&.class)).to eq [TermBuf::Events::Key]
-
-      app.pump
       expect(root.seen.map(&.class)).to eq [TermBuf::Events::Key, Fixtures::Said]
     end
   end

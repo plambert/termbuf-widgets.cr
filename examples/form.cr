@@ -5,8 +5,9 @@
 #     crystal run examples/form.cr
 #
 # Up and Down move between rows in a form, and Tab moves through the rows and on
-# into the other form. Space toggles, Left and Right move a choice or step a
-# number, Enter or Space presses an action row, and typing edits a text row.
+# into the other form. Space or Enter toggles or moves a choice on, Left and
+# Right move a choice or step a number, Enter or Space presses an action row,
+# and typing edits a text row.
 # Enter or Space on the accent color opens a picker under it, or in a dialog
 # when there is no room. Enter keeps the color and Escape puts it back. The
 # settings form is taller than its window on a short terminal, so it scrolls as
@@ -31,8 +32,9 @@ def expected : Widgets::Widget
   lines = [
     "Left: settings in three sections. Right: a dialog with Submit and Cancel.",
     "Up and Down move between rows; headers and the dimmed row are skipped.",
+    "Each change shows on the bottom line on the same key.",
     "The line under the rows shows the help of the row with the keyboard.",
-    "Space toggles, Left and Right move a choice or step a number.",
+    "Space or Enter toggles or moves a choice on. Left and Right step a choice or number.",
     "Enter or Space on 'Key bindings' or 'Reset' says Activated below.",
     "Enter on 'Accent' opens a picker; each change says Changed. Escape puts it back.",
     "Shrink the terminal: the settings scroll and a scrollbar shows on the right.",

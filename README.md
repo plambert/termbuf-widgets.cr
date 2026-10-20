@@ -336,10 +336,12 @@ end
 ```
 
 `Message` includes `TermBuf::Event`, so a handler answers one the same way it answers a key.
-`Widget#emit` walks up to the root's `Mailbox`, which the router sets; delivery is on the next
-`App#pump`, starting at the emitter's parent, so a widget never sees its own message in the
-dispatch that emitted it. `Router#drain` is one pass, so a pair of widgets answering each other
-cannot spin a frame.
+`Widget#emit` walks up to the root's `Mailbox`, which the router sets. Delivery is in the next
+`Router#drain`, starting at the emitter's parent, so a widget never sees its own message in the
+dispatch that emitted it. `App#pump` drains after the events it takes, so a message is heard in the
+same pump as the key that caused it. A message emitted while draining is delivered in the same
+drain, up to `Router::PASSES` rounds, so a pair of widgets answering each other cannot spin a
+frame.
 
 ## Rendering
 
@@ -565,8 +567,15 @@ form.attach app        # the color row's picker opens on the app's screen
 
 The rows scroll in their own window, `Up` and `Down` move between them, and the help of the row
 with the keyboard shows under the window. A form narrower than `#narrow` puts its labels above the
-inputs. `form.enable "key", false` dims a row and takes it out of the tab order. A form built by
-hand with `#add` keeps its `Submit` and `Cancel` buttons and the rules gathered in one place:
+inputs. `form.enable "key", false` dims a row and takes it out of the tab order. A letter bound on
+the form, such as `j`, still types into a text row. A host that binds letters around the form
+checks `form.typing?`, or calls `form.type context` to hand the key to the row, before it acts on
+one.
+
+A form grows to the height its parent has left, as every scrolling widget does. Inside a parent
+sized to fit, such as an overlay sized to its content, give it `height: Layout::Sizing.fit`, or it
+shrinks to its first row. A form built by hand with `#add` keeps its `Submit` and `Cancel` buttons
+and the rules gathered in one place:
 
 ```crystal
 form = Widgets::Form.new

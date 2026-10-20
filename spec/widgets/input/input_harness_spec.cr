@@ -29,11 +29,8 @@ module Fixtures
     end
   end
 
-  # Pumps *app* until nothing more comes of it.
-  #
-  # One pump delivers the events waiting and one more delivers the messages
-  # they caused, since a message emitted while an event is being answered is
-  # held over to the next drain.
+  # Pumps *app* until nothing more comes of it, which is what a timer or a
+  # message left over from a long exchange needs.
   def self.settle(app : TestApp, rounds : Int32 = 4) : Nil
     rounds.times { break if app.pump.zero? }
   end

@@ -184,15 +184,19 @@ module TermBuf::Widgets
       end
     end
 
-    # The line under the window that shows the help of the focused row, and
-    # its note on the line after.
+    # The lines under the window that show the help of the focused row,
+    # wrapped to the width, and its note under that.
+    #
+    # It is as tall as the longest help and note of any row at its width, so
+    # the window does not move as the keyboard does. A parent with less room
+    # cuts it at the bottom.
     class HelpLine < Widget
       # The form whose rows it describes.
       property form : Form? = nil
 
       def initialize
         @width = Layout::Sizing.grow
-        @height = Layout::Sizing.fixed 1
+        @height = Layout::Sizing.fit min: 1
       end
 
       def intrinsic_width(policy : Unicode::WidthPolicy) : Layout::Intrinsic
@@ -200,7 +204,12 @@ module TermBuf::Widgets
       end
 
       def height_for_width(width : Int32, policy : Unicode::WidthPolicy) : Int32
-        1
+        rows = @form.try(&.rows) || [] of Row
+        tallest = rows.max_of? do |row|
+          lines(row.help, width, policy).size + lines(row.note, width, policy).size
+        end
+
+        Math.max 1, tallest || 0
       end
 
       def draw(view : View) : Nil
@@ -210,14 +219,30 @@ module TermBuf::Widgets
         row = owner.try &.focused_row
         return unless owner && row
 
-        if help = row.help
-          view.write 0, 0, Unicode.truncate(help, view.width, view.policy), owner.help_style
+        top = write view, 0, row.help, owner.help_style
+        write view, top, row.note, owner.note_style
+      end
+
+      # Writes *text* wrapped to the view from *top* down, and answers the row
+      # after the last one written.
+      private def write(view : View, top : Int32, text : String?, style : Style) : Int32
+        lines(text, view.width, view.policy).each do |line|
+          return top if top >= view.height
+
+          view.write 0, top, Unicode.truncate(line, view.width, view.policy), style
+          top += 1
         end
 
-        note = row.note
-        return unless note && view.height > 1
+        top
+      end
 
-        view.write 0, 1, Unicode.truncate(note, view.width, view.policy), owner.note_style
+      # *text* broken into lines at word boundaries to fit *width*, or none
+      # for no text.
+      private def lines(text : String?, width : Int32, policy : Unicode::WidthPolicy) : Array(String)
+        return [] of String if text.nil? || text.empty?
+
+        measured = Layout::TextMeasure.measure text, policy
+        Layout::TextMeasure.wrap(measured, width, Layout::Wrap::Words).map &.text(text)
       end
     end
   end

@@ -461,6 +461,27 @@ Spectator.describe TermBuf::Widgets::Form do
     end
   end
 
+  describe "a change" do
+    it "is heard in the same pump as the key that made it" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.press made, "Space"
+
+      expect(changes root).to eq [{"motion", false}] of {String, Form::Value}
+    end
+
+    it "is heard in the same wait as the key that made it" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      made.events.send TermBuf::Events::Key.new(TermBuf::Key.parse_one("Space"), Bytes.empty)
+      made.wait
+
+      expect(changes root).to eq [{"motion", false}] of {String, Form::Value}
+    end
+  end
+
   describe "each kind" do
     it "toggles on Space and says so" do
       form = settings
@@ -470,6 +491,50 @@ Spectator.describe TermBuf::Widgets::Form do
 
       expect(changes root).to eq [{"motion", false}]
       expect(Fixtures.frame(made)[1]).to eq "Animate ☐"
+    end
+
+    it "toggles on Enter as it does on Space" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.presses made, "Enter"
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to eq [{"motion", false}, {"motion", true}]
+    end
+
+    it "moves a choice on one on Enter, from the last back to the first" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.presses made, "Down"
+      Fixtures.presses made, "Enter"
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to eq [{"bars", "bands"}, {"bars", "gradient"}]
+    end
+
+    it "toggles on Enter in a form with buttons rather than submitting" do
+      form = Form.new
+      form.toggle "wrap", "Wrap", value: true
+      form.add "name", Field.new
+      root = rooted form
+      made = app root
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to eq [{"wrap", false}] of {String, Form::Value}
+      expect(root.of(Form::Submitted)).to be_empty
+    end
+
+    it "leaves Enter on a text row to the field" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Enter"
+
+      expect(changes root).to be_empty
+      expect(form["name"]).to eq "anon"
     end
 
     it "moves an inline choice on Left and Right and says so" do
@@ -586,6 +651,84 @@ Spectator.describe TermBuf::Widgets::Form do
     end
   end
 
+  describe "typing at a row" do
+    # *form* with `j` and `k` bound on its own keymap to move between rows.
+    def lettered(form : Form) : Form
+      letters = TermBuf::Widgets::Bindings.build do |map|
+        map.bind TermBuf::Key.parse("j"), "the row below",
+          ->(context : TermBuf::Widgets::Context) { form.step_row 1, context }
+        map.bind TermBuf::Key.parse("k"), "the row above",
+          ->(context : TermBuf::Widgets::Context) { form.step_row(-1, context) }
+      end
+      form.keymap = Form.row_keys(form).merge letters
+      form
+    end
+
+    it "says whether the row with the keyboard takes free text" do
+      form = settings
+      made = app rooted(form), 40, 10
+      seen = [] of Bool
+
+      4.times do
+        seen << form.typing?
+        Fixtures.presses made, "Down"
+      end
+      seen << form.typing?
+
+      expect(seen).to eq [false, false, false, true, false]
+    end
+
+    it "takes digits on a number row and every printable key on a text row" do
+      form = settings
+      made = app rooted(form), 40, 10
+      2.times { Fixtures.presses made, "Down" }
+      digit = TermBuf::Key.parse_one "5"
+      letter = TermBuf::Key.parse_one "j"
+      on_number = {form.types?(digit), form.types?(letter)}
+      Fixtures.presses made, "Down"
+
+      expect(on_number).to eq({true, false})
+      expect({form.types?(digit), form.types?(letter)}).to eq({true, true})
+      expect(form.types?(TermBuf::Key.parse_one("Ctrl+j"))).to be_false
+    end
+
+    it "lets a printable key bound on the form through to a text row" do
+      form = lettered settings
+      made = app rooted(form), 40, 10
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.press made, "End"
+      Fixtures.type made, "jk"
+
+      expect(form["name"]).to eq "anonjk"
+      expect(form.focused_row.try &.key).to eq "name"
+    end
+
+    it "still fires that binding on a row that does not take text" do
+      form = lettered settings
+      made = app rooted(form), 40, 10
+      Fixtures.type made, "jj"
+
+      expect(form.focused_row.try &.key).to eq "wheel"
+    end
+
+    it "hands a key to a text row for a host binding that asks #type" do
+      form = settings
+      root = rooted form
+      moved = 0
+      root.keymap = TermBuf::Widgets::Bindings.build do |map|
+        map.bind TermBuf::Key.parse("j"), "the row below",
+          ->(context : TermBuf::Widgets::Context) { moved += 1 unless form.type context; nil }
+      end
+      made = app root, 40, 10
+      Fixtures.type made, "j"
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.type made, "j"
+
+      expect(moved).to eq 1
+      expect(changes root).to eq [{"name", "anonj"}] of {String, Form::Value}
+    end
+  end
+
   describe "moving between rows" do
     it "moves down and up, skipping headers and stopping at the ends" do
       form = settings
@@ -655,6 +798,28 @@ Spectator.describe TermBuf::Widgets::Form do
       made = app rooted(form), 40, 11
 
       expect(Fixtures.frame(made)[8..9]).to eq ["Panels slide.", "Set by the server."]
+    end
+
+    it "wraps a help line wider than the form onto the rows under it" do
+      form = Form.new actions: false, label_position: Form::LabelPosition::Left
+      form.toggle "motion", "Animate", help: "Panels slide and fade. Off draws the end state."
+      form.toggle "mouse", "Mouse", help: "Reports clicks."
+      form.note "motion", "Set by the server for this run."
+      made = app rooted(form), 20, 8
+
+      expect(Fixtures.frame(made)).to eq [
+        "Animate ☐",
+        "Mouse   ☐",
+        "Panels slide and",
+        "fade. Off draws the",
+        "end state.",
+        "Set by the server",
+        "for this run.",
+        "",
+      ]
+
+      Fixtures.presses made, "Down"
+      expect(Fixtures.frame(made)[0..3]).to eq ["Animate ☐", "Mouse   ☐", "Reports clicks.", ""]
     end
 
     it "leaves the help line out when no row has help" do
@@ -766,6 +931,41 @@ Spectator.describe TermBuf::Widgets::Form do
       Fixtures.render rooted(form), 30, 10
 
       expect(form.rect.height).to eq 4
+    end
+
+    # *form* in a box that fits its content, no taller than *rows*, at the top
+    # of a screen of ten rows.
+    def boxed(form : Form, rows : Int32) : {Log, TermBuf::Widgets::Panel}
+      box = TermBuf::Widgets::Panel.new direction: TermBuf::Widgets::Layout::Direction::Column,
+        width: Sizing.grow, height: Sizing.fit(max: rows)
+      box.add form
+      root = Log.new
+      root.width = Sizing.grow
+      root.height = Sizing.grow
+      root.add box
+      {root, box}
+    end
+
+    it "shrinks to its first row in a box that fits, at its default height" do
+      form, _ = tall 3
+      root, _ = boxed form, 8
+      Fixtures.render root, 30, 10
+
+      expect(form.rect.height).to eq 2
+    end
+
+    it "fills a box that fits and scrolls inside it when told to fit" do
+      form, boxes = tall 12
+      form.height = Sizing.fit
+      root, box = boxed form, 6
+      made = app root, 30, 10
+      Fixtures.presses made, "End"
+      made.frame
+
+      expect(box.rect.height).to eq 6
+      expect(form.rect.height).to eq 6
+      expect(made.focused).to be boxes.last
+      expect(in_view?(form, boxes.last)).to be_true
     end
   end
 

@@ -72,19 +72,37 @@ module TermBuf::Widgets
   # input. `#label_position` forces either.
   #
   # The rows scroll in a window with a scrollbar on its right, which draws
-  # only while the rows are taller than the window. Under the window, a line
-  # shows the help and the note of the row with the keyboard. That line is
-  # left out of a form where no row has either.
+  # only while the rows are taller than the window. Under the window, the
+  # help and the note of the row with the keyboard are wrapped to the width.
+  # They take as many rows as the longest help and note of any row, so the
+  # window stays put as the keyboard moves. They are left out of a form
+  # where no row has either.
+  #
+  # A form is `Layout::Sizing.grow` tall by default, as every scrolling
+  # widget in this shard is, so it takes the room its parent has left. A
+  # parent sized `fit` counts a growing child at its floor, which for a form
+  # is the first section header and its first row. Give a form in a parent
+  # that fits, such as a dialog or an overlay sized to its content,
+  # `height: Layout::Sizing.fit`. It is then as tall as its rows, and
+  # scrolls when the parent's `max` is shorter than that.
   #
   # ### Keys
   #
-  # `Up` and `Down` move between rows and stop at the ends. `Tab` and
+  # `Space` and `Enter` toggle a toggle row and move a choice row on one.
+  # `Enter` and `Space` press an action row. `Up` and `Down` move between
+  # rows and stop at the ends. `Tab` and
   # `Shift+Tab` move through the focus ring. `Home` and `End` go to the first
   # and last row, except on a text row, where they move the cursor, and on a
   # number row, where they go to the ends of its range. `PageUp` and
   # `PageDown` move a window's worth. The form binds them in its own keymap,
   # so an application can rebind them. Whatever else a row's widget binds, it
   # keeps.
+  #
+  # A binding on a printable key fires before the row's widget sees the key.
+  # The form drops its own bindings on a key the row with the keyboard takes
+  # as text, so `j` bound on the form still types a `j` into a text row. A
+  # host that binds printable keys around the form asks `#typing?` or hands
+  # the key over with `#type`.
   #
   # ### Handing it over
   #
@@ -514,15 +532,14 @@ module TermBuf::Widgets
       end || 0
     end
 
-    # Shows the help line when any row has help or a note, with a second line
-    # when any has a note.
+    # Shows the help line when any row has help or a note, and lays it out
+    # again for the text it now holds.
     #
     # :nodoc:
     def refresh_help : Nil
       all = rows
-      noted = all.any? &.note
-      @help_line.height = Layout::Sizing.fixed(noted ? 2 : 1)
-      @help_line.hidden = !noted && all.none?(&.help)
+      @help_line.hidden = all.none?(&.note) && all.none?(&.help)
+      @help_line.invalidate_layout
     end
 
     # *widget* if the keyboard can land on it, and otherwise the first thing
@@ -707,6 +724,59 @@ module TermBuf::Widgets
       rows.find &.focused?(held)
     end
 
+    # Whether *key* is one a person types as text: a character with no
+    # `Ctrl`, `Alt` or `Super` held.
+    def self.printable?(key : Key) : Bool
+      key.character? && !key.ctrl? && !key.alt? && !key.super?
+    end
+
+    # Whether the row with the keyboard takes free text, as a text row does.
+    #
+    # A binding on a printable key fires before the row's widget sees the
+    # key. A host that binds one, such as `j` to move down, asks this or
+    # `#type` first so that the letter still goes into a text row.
+    def typing? : Bool
+      focused_row.try(&.typing?) || false
+    end
+
+    # Whether the row with the keyboard takes *key* as text. A number row
+    # takes digits, and a text row takes every printable key.
+    def types?(key : Key) : Bool
+      focused_row.try(&.types?(key)) || false
+    end
+
+    # Hands the key *context* is answering to the row with the keyboard when
+    # the row takes it as text. Answers whether it did.
+    #
+    #     map.bind Key.parse("j"), "the row below",
+    #       ->(context : Context) { form.step_row 1, context unless form.type context }
+    def type(context : Context) : Bool
+      event = context.event
+      return false unless event.is_a? Events::Key
+
+      row = focused_row
+      return false unless row && row.types?(event.key)
+
+      row.press event.key
+      context.consume
+      true
+    end
+
+    # The form's bindings, less any on a printable key the row with the
+    # keyboard takes as text, which the row's widget gets instead.
+    def keymap : Bindings?
+      bound = super
+      row = focused_row
+      return bound unless bound && row
+
+      typed = bound.bindings.select { |binding| row.types? binding.keys.first }
+      return bound if typed.empty?
+
+      kept = Bindings.new
+      bound.bindings.each { |binding| kept.bind binding unless typed.includes? binding }
+      kept
+    end
+
     # The keys that move between rows, bound on *form* so an application can
     # rebind them.
     def self.row_keys(form : Form) : Bindings
@@ -832,10 +902,12 @@ module TermBuf::Widgets
 
     # ------------------------------------------------------------- events
 
-    # Takes a button press, a line handed over by a field, and the messages
-    # that mean a row changed.
+    # Takes `Enter` on a row whose widget left it alone, a button press, a
+    # line handed over by a field, and the messages that mean a row changed.
     def handle(event : Event, context : Context) : Nil
       case event
+      when Events::Key
+        entered_row event, context
       when Button::Pressed
         pressed event, context
       when Field::Accepted
@@ -848,6 +920,15 @@ module TermBuf::Widgets
       else
         changed event, context
       end
+    end
+
+    # `Enter` on a toggle or a choice row does what `Space` does there.
+    private def entered_row(event : Events::Key, context : Context) : Nil
+      return unless event.key.is? Key::Name::Enter
+      return unless event.key.modifiers.none?
+
+      row = focused_row
+      context.consume if row && row.enter
     end
 
     private def pressed(event : Button::Pressed, context : Context) : Nil

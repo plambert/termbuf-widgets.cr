@@ -166,19 +166,31 @@ module TermBuf::Widgets
       @pending << Post.new(message, source)
     end
 
+    # How many times `#drain` goes round for the messages its own handlers
+    # emit.
+    PASSES = 8
+
     # Delivers everything emitted since the last drain, answering how many that
     # was.
     #
-    # One pass: a message emitted by a handler running here waits for the next
-    # drain, so a pair of widgets answering each other cannot spin a frame.
+    # A message emitted by a handler running here is delivered in the same
+    # drain, so a widget that answers another's message is heard on the same
+    # key. The drain stops after `PASSES` rounds, and whatever is still
+    # pending waits for the next one, so a pair of widgets answering each
+    # other cannot spin a frame.
     def drain : Int32
-      return 0 if @pending.empty?
+      delivered = 0
 
-      posts = @pending.dup
-      @pending.clear
-      posts.each { |post| dispatch post.message, post.source }
+      PASSES.times do
+        break if @pending.empty?
 
-      posts.size
+        posts = @pending.dup
+        @pending.clear
+        posts.each { |post| dispatch post.message, post.source }
+        delivered += posts.size
+      end
+
+      delivered
     end
 
     # The widgets that get a say, *node* first, up to and including the top

@@ -29,6 +29,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `form["key"] = value` sets it and sends nothing. `Form::Changed` carries the key and the value of
   every change a person makes. An action row holds no value and emits `Form::Activated` with its
   key on `Enter`, `Space` and a click.
+- `Form#typing?` says whether the row with the keyboard takes free text, and `Form#types?` whether
+  it takes a given key. `Form#type` hands the key being answered to that row and says whether it
+  did, for a host that binds letters around the form.
+- `Enter` on a toggle row toggles it and `Enter` on a choice row moves it on one, as `Space` does.
 - `Form#enable` dims a row and takes it out of the keyboard's path. `Form#note` adds a line under
   the row's help, for a value forced from elsewhere.
 - `examples/form.cr`, a settings form with every row kind beside a dialog form with buttons.
@@ -47,10 +51,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Changed
 
 - `Form` puts its rows in a scrolling window with a scrollbar, and the help of the row with the
-  keyboard on a line under it. `Up`, `Down`, `Home`, `End`, `PageUp` and `PageDown` move between
-  rows, and `Tab` brings the row it lands on into view. A click on a label presses the row.
+  keyboard under it, wrapped to the width. The help takes as many rows as the longest help of any
+  row, so the window does not move with the keyboard. `Up`, `Down`, `Home`, `End`, `PageUp` and
+  `PageDown` move between rows, and `Tab` brings the row it lands on into view. A click on a label
+  presses the row.
 - `Form` is `Layout::Sizing.grow` tall by default. Its window is as tall as the rows when there
-  is room and scrolls when there is not.
+  is room and scrolls when there is not. A form inside a parent sized to fit needs
+  `height: Layout::Sizing.fit`, or it shrinks to its first row.
 - A `Form` narrower than `#narrow` cells, 24 by default, puts each label above its input.
   `#label_position` is `nil` by default and forces either side when set.
 - `Form.new actions: false` builds a form without the `Submit` and `Cancel` buttons, and without
@@ -58,6 +65,12 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Form#values` answers typed values. The text of each row, which `Submitted` carries and the
   form's `#rules` are asked about, is `Form#texts`.
 - `Form#add` takes an optional `help`.
+- A binding on the form's own keymap for a printable key is skipped while the row with the
+  keyboard takes that key as text, so a letter bound for moving between rows still types into a
+  text row.
+- `Router#drain` delivers the messages its own handlers emit in the same drain, for up to
+  `Router::PASSES` rounds, and `App#pump` drains again after the events it takes. A widget that
+  answers another's message, such as `Form` sending `Form::Changed`, is heard on the same key.
 
 ## [0.11.0] - 2026-10-20
 

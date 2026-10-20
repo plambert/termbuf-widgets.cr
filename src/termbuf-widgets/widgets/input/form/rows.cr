@@ -117,6 +117,17 @@ module TermBuf::Widgets
         false
       end
 
+      # Whether the input takes free text, so that every printable key typed
+      # at it belongs to it.
+      def typing? : Bool
+        false
+      end
+
+      # Whether the input takes *key* as text.
+      def types?(key : Key) : Bool
+        typing? && Form.printable?(key)
+      end
+
       # Hands a key the row keeps to its input.
       def press(key : Key) : Nil
       end
@@ -131,6 +142,12 @@ module TermBuf::Widgets
 
       # What pressing the row does, beyond taking the keyboard.
       def activate : Nil
+      end
+
+      # Does what `Enter` means on the row when its widget left the key alone,
+      # and answers whether it did anything.
+      def enter : Bool
+        false
       end
 
       # Called as the keyboard leaves the row.
@@ -198,6 +215,14 @@ module TermBuf::Widgets
         @owner.try &.text_of(@widget)
       end
 
+      # A field and a text area take free text.
+      def typing? : Bool
+        case target
+        when TextArea, Field then true
+        else                      false
+        end
+      end
+
       # A field keeps the keys that move its cursor, and a text area keeps
       # the ones that move between its lines as well.
       def keeps?(key : Key) : Bool
@@ -255,6 +280,12 @@ module TermBuf::Widgets
       def activate : Nil
         @input.toggle
       end
+
+      # `Enter` toggles the box, as `Space` does.
+      def enter : Bool
+        @input.toggle
+        true
+      end
     end
 
     # A row holding one of a few strings.
@@ -286,6 +317,12 @@ module TermBuf::Widgets
 
       def disable_input(off : Bool) : Nil
         @input.disabled = off
+      end
+
+      # `Enter` moves the mark on one, as `Space` does.
+      def enter : Bool
+        @input.cycle
+        true
       end
     end
 
@@ -322,6 +359,15 @@ module TermBuf::Widgets
 
       def leave : Nil
         @input.settle
+      end
+
+      # A number row takes digits and a minus sign.
+      def types?(key : Key) : Bool
+        Form.printable?(key) && (key.char.ascii_number? || key.char == '-')
+      end
+
+      def press(key : Key) : Nil
+        @input.press key
       end
     end
 
@@ -362,6 +408,10 @@ module TermBuf::Widgets
 
       def keeps?(key : Key) : Bool
         KEPT.includes? key
+      end
+
+      def typing? : Bool
+        true
       end
 
       def press(key : Key) : Nil
