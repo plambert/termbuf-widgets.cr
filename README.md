@@ -517,6 +517,7 @@ tree = Widgets::Tree.new Widgets::Nodes.from(roots,
 | `Checkbox` | a box that is ticked or not, toggled by `Space` or a click |
 | `CheckboxGroup` | a column of boxes answering one question, with `min` and `max` on how many may be ticked |
 | `TextArea` | somewhere to type more than one line, moving by drawn row rather than by line |
+| `NumberField` | a field holding one integer in a range, stepped by the arrows, with an optional bar |
 | `ValidatedField` | a field holding its line to a list of rules, drawing the first refusal under the line |
 | `MaskedField` | a validated field drawing a mark per character, with `#value` for the text as typed |
 | `Validator` | `Proc(String, String?)`, with `required`, `length`, `matches`, `numeric`, `one_of` and `all` in `Validators` |
@@ -525,12 +526,36 @@ tree = Widgets::Tree.new Widgets::Nodes.from(roots,
 | `Combobox(T)` | a field with a selection list floating under it, narrowed by what is typed |
 | `KeywordList` | a field with the keywords already typed sitting above it as chips, which wrap as they grow |
 | `ListSelector(T)` | two lists in a `Split` with a column of buttons between them |
-| `Form` | labelled fields in a column, with the rules gathered in one place and a `#submit` that asks them all |
+| `Form` | sections of labeled rows in a scrolling window, built from a schema or by hand, with optional buttons |
 
 Each of them says what happened to it with a `Message` and knows nothing about what that means. A
 disabled control is out of the tab order and answers nothing, but is still drawn: one that vanishes
 when it cannot be used tells the user less than one that is visibly unavailable. A group that
 refuses a toggle puts it back and says `Refused` rather than `Changed`.
+
+A settings form is described as data. Each row has a key, a label and an optional help line, and
+the form answers `#values` by key, typed as `Bool`, `Int32` or `String`. Every change a person makes
+emits `Form::Changed` with the key and the value. An `action` row holds nothing and emits
+`Form::Activated` when it is pressed.
+
+```crystal
+form = Widgets::Form.new actions: false
+form.section "Display" do |section|
+  section.toggle "motion", "Animate the panels", value: true, help: "Off draws the end state."
+  section.choice "bars", "Bar color", %w[gradient bands], value: "gradient"
+end
+form.section "Input" do |section|
+  section.number "wheel", "Cells per wheel notch", value: 3, range: 1..10
+  section.text "name", "Tester name", value: "anonymous"
+  section.action "keys", "Key bindings", hint: "Enter to open"
+end
+form["motion"] = false # sets it and sends nothing
+```
+
+The rows scroll in their own window, `Up` and `Down` move between them, and the help of the row
+with the keyboard shows under the window. A form narrower than `#narrow` puts its labels above the
+inputs. `form.enable "key", false` dims a row and takes it out of the tab order. A form built by
+hand with `#add` keeps its `Submit` and `Cancel` buttons and the rules gathered in one place:
 
 ```crystal
 form = Widgets::Form.new

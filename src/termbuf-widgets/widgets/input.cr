@@ -6,6 +6,8 @@
 #   that is ticked or not, and a set of them answering one question under
 #   bounds on how many may be.
 # * `TermBuf::Widgets::TextArea` — somewhere to type more than one line.
+# * `TermBuf::Widgets::NumberField` — a field holding one integer in a range,
+#   stepped by the arrows.
 # * `TermBuf::Widgets::ValidatedField` and `TermBuf::Widgets::MaskedField` —
 #   a `TermBuf::Widgets::Field` held to a list of rules, and one drawing a
 #   mark per character.
@@ -21,8 +23,8 @@
 #   sitting above it as chips.
 # * `TermBuf::Widgets::ListSelector` — two lists with a column of buttons
 #   between them for sending a row across.
-# * `TermBuf::Widgets::Form` — labelled fields in a column, with the rules
-#   gathered in one place.
+# * `TermBuf::Widgets::Form` — sections of labeled rows in a scrolling window,
+#   built from a schema or by hand, with the rules gathered in one place.
 #
 # Each of them says what happened to it with a `TermBuf::Widgets::Message` and
 # knows nothing about what that means: the widget that contains it answers the
@@ -36,6 +38,7 @@ require "./input/button_group"
 require "./input/checkbox"
 require "./input/checkbox_group"
 require "./input/text_area"
+require "./input/number_field"
 require "./input/validators"
 require "./input/validated_field"
 require "./input/masked_field"
