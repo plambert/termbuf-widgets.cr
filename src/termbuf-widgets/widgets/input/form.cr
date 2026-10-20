@@ -76,6 +76,14 @@ module TermBuf::Widgets
   # shows the help and the note of the row with the keyboard. That line is
   # left out of a form where no row has either.
   #
+  # A form is `Layout::Sizing.grow` tall by default, as every scrolling
+  # widget in this shard is, so it takes the room its parent has left. A
+  # parent sized `fit` counts a growing child at its floor, which for a form
+  # is the first section header and its first row. Give a form in a parent
+  # that fits, such as a dialog or an overlay sized to its content,
+  # `height: Layout::Sizing.fit`. It is then as tall as its rows, and
+  # scrolls when the parent's `max` is shorter than that.
+  #
   # ### Keys
   #
   # `Up` and `Down` move between rows and stop at the ends. `Tab` and

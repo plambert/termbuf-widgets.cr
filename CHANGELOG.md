@@ -53,7 +53,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   keyboard on a line under it. `Up`, `Down`, `Home`, `End`, `PageUp` and `PageDown` move between
   rows, and `Tab` brings the row it lands on into view. A click on a label presses the row.
 - `Form` is `Layout::Sizing.grow` tall by default. Its window is as tall as the rows when there
-  is room and scrolls when there is not.
+  is room and scrolls when there is not. A form inside a parent sized to fit needs
+  `height: Layout::Sizing.fit`, or it shrinks to its first row.
 - A `Form` narrower than `#narrow` cells, 24 by default, puts each label above its input.
   `#label_position` is `nil` by default and forces either side when set.
 - `Form.new actions: false` builds a form without the `Submit` and `Cancel` buttons, and without

@@ -866,6 +866,41 @@ Spectator.describe TermBuf::Widgets::Form do
 
       expect(form.rect.height).to eq 4
     end
+
+    # *form* in a box that fits its content, no taller than *rows*, at the top
+    # of a screen of ten rows.
+    def boxed(form : Form, rows : Int32) : {Log, TermBuf::Widgets::Panel}
+      box = TermBuf::Widgets::Panel.new direction: TermBuf::Widgets::Layout::Direction::Column,
+        width: Sizing.grow, height: Sizing.fit(max: rows)
+      box.add form
+      root = Log.new
+      root.width = Sizing.grow
+      root.height = Sizing.grow
+      root.add box
+      {root, box}
+    end
+
+    it "shrinks to its first row in a box that fits, at its default height" do
+      form, _ = tall 3
+      root, _ = boxed form, 8
+      Fixtures.render root, 30, 10
+
+      expect(form.rect.height).to eq 2
+    end
+
+    it "fills a box that fits and scrolls inside it when told to fit" do
+      form, boxes = tall 12
+      form.height = Sizing.fit
+      root, box = boxed form, 6
+      made = app root, 30, 10
+      Fixtures.presses made, "End"
+      made.frame
+
+      expect(box.rect.height).to eq 6
+      expect(form.rect.height).to eq 6
+      expect(made.focused).to be boxes.last
+      expect(in_view?(form, boxes.last)).to be_true
+    end
   end
 
   describe "a narrow form" do
