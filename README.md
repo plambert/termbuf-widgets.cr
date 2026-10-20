@@ -457,6 +457,7 @@ pane.add notes
 | `Picture` | a picture over the cells it is given, with alt text for the terminals that draw none |
 | `Hyperlink` | text carrying an OSC 8 link, which reveals the address once the keyboard reaches it |
 | `CopyButton` | a button that copies what a block answers and flashes a label to say it did |
+| `ColorSwatch` | one color as a bar with its value beside it, written over it when the row is narrow |
 
 `Readout` is the base for a widget drawing one line it works out for itself, as against a `Label`
 drawing text it was handed.
@@ -526,6 +527,7 @@ tree = Widgets::Tree.new Widgets::Nodes.from(roots,
 | `KeywordList` | a field with the keywords already typed sitting above it as chips, which wrap as they grow |
 | `ListSelector(T)` | two lists in a `Split` with a column of buttons between them |
 | `Form` | labelled fields in a column, with the rules gathered in one place and a `#submit` that asks them all |
+| `ColorPicker` | a swatch, a grid of the palette's colors, and fields for red, green, blue and hex |
 
 Each of them says what happened to it with a `Message` and knows nothing about what that means. A
 disabled control is out of the tab order and answers nothing, but is still drawn: one that vanishes
@@ -546,6 +548,19 @@ thing: `Option.all` labels each value by `#to_s`, and `Option.new("ssh", 22)` sa
 speaking the kitty keyboard protocol can report `Ctrl+Enter`: `Enter` is the byte `0x0D` and
 control does not change it. `TextArea.default_accept_keys` is therefore both `Ctrl+Enter` and
 `Alt+Enter`, and `#accept_keys` takes whatever an application would rather use.
+
+`ColorSwatch` and `ColorPicker` each take a `Depth`. `Depth::TrueColor` offers every 24 bit color.
+`Depth::Indexed256` offers the 256 color palette and shows a color the way a terminal without true
+color draws it, which is the index `Color#to_indexed256` picks. A swatch at that depth writes the
+index after the hex value. A picker at that depth holds a palette index as its value, and a field
+edit moves to the nearest index. The picker emits `ColorPicker::Changed` for each change, and the
+application decides which change is final.
+
+```crystal
+picker = Widgets::ColorPicker.new TermBuf::Color.rgb(0x3080C0),
+  depth: Widgets::Depth::Indexed256
+picker.reset_to = TermBuf::Color.rgb(0xC0C0C0)
+```
 
 ### Navigation
 

@@ -23,6 +23,8 @@
 #   between them for sending a row across.
 # * `TermBuf::Widgets::Form` — labelled fields in a column, with the rules
 #   gathered in one place.
+# * `TermBuf::Widgets::ColorPicker` — a grid of colors and fields for the
+#   value, at either `TermBuf::Widgets::Depth`.
 #
 # Each of them says what happened to it with a `TermBuf::Widgets::Message` and
 # knows nothing about what that means: the widget that contains it answers the
@@ -44,3 +46,4 @@ require "./input/combobox"
 require "./input/keyword_list"
 require "./input/list_selector"
 require "./input/form"
+require "./input/color_picker"
