@@ -3,9 +3,10 @@
 #     crystal run examples/color.cr
 #
 # The arrows move over the grid, and Enter, Space or a click takes a color.
-# Tab moves between the grid and the four fields; in a channel field Up and
-# Down step it. Ctrl+T switches the picker between true color and the 256
-# color palette. Ctrl+Q leaves.
+# Tab moves between the grid and the four fields. In a channel field the
+# arrows step it, Home and End go to 0 and 255, and Enter clamps it. Ctrl+T
+# switches the picker between true color and the 256 color palette. Ctrl+Q
+# leaves.
 #
 # The panel at the top says what should be on the screen and what each key
 # should do, because an example is a manual test. It is written out of the
@@ -27,7 +28,8 @@ def expected : Widgets::Widget
     "Two swatches: the chosen color in true color, and as a 256 color terminal draws it.",
     "Under them the picker: its own swatch, a grid of colors, and the fields.",
     "Arrows move the [] cursor; Enter, Space or a click takes the color under it.",
-    "Tab visits the grid, R, G, B and Hex, and wraps. Up and Down step a channel.",
+    "Tab visits the grid, R, G, B and Hex, and wraps. Arrows step a channel.",
+    "Home and End take a channel to 0 and 255; Enter clamps what was typed.",
     "Typing a channel or a whole hex value moves the swatches as you type.",
     "Ctrl+T switches to 256 colors: the system colors appear on top of the grid,",
     "and a field edit snaps to the nearest index when Tab leaves the field.",

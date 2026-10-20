@@ -179,13 +179,44 @@ Spectator.describe TermBuf::Widgets::ColorPicker do
                                   Color.rgb(200, 95, 135)]
     end
 
-    it "refuses what is not a channel" do
+    it "refuses what is not a digit, and clamps on Enter" do
       picker = ColorPicker.new Color.rgb(0, 0, 0)
-      made = app rooted(picker)
+      root = rooted picker
+      made = app root
       Fixtures.presses made, "Tab Ctrl+U"
       Fixtures.type made, "2x60"
+      Fixtures.settle made
 
-      expect(picker.red.text).to eq "26"
+      expect(picker.red.text).to eq "260"
+      expect(picker.value).to eq Color.rgb(26, 0, 0)
+
+      Fixtures.presses made, "Enter"
+      expect(picker.red.text).to eq "255"
+      expect(picker.value).to eq Color.rgb(255, 0, 0)
+      expect(made.focused).to be picker.red
+    end
+
+    it "puts an empty channel back to its value on Enter" do
+      picker = ColorPicker.new Color.rgb(40, 0, 0)
+      made = app rooted(picker)
+      Fixtures.presses made, "Tab Ctrl+U Enter"
+
+      expect(picker.red.text).to eq "40"
+      expect(picker.value).to eq Color.rgb(40, 0, 0)
+    end
+
+    it "steps with Left and Right, and goes to the ends with Home and End" do
+      picker = ColorPicker.new Color.rgb(10, 0, 0)
+      made = app rooted(picker)
+      Fixtures.presses made, "Tab Right Right Left"
+      expect(picker.value).to eq Color.rgb(11, 0, 0)
+
+      Fixtures.presses made, "End"
+      expect(picker.value).to eq Color.rgb(255, 0, 0)
+
+      Fixtures.presses made, "Home"
+      expect(picker.value).to eq Color.rgb(0, 0, 0)
+      expect(picker.red.text).to eq "0"
     end
 
     it "sets all three channels from a hex edit" do
