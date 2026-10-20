@@ -86,6 +86,12 @@ module TermBuf::Widgets
   # so an application can rebind them. Whatever else a row's widget binds, it
   # keeps.
   #
+  # A binding on a printable key fires before the row's widget sees the key.
+  # The form drops its own bindings on a key the row with the keyboard takes
+  # as text, so `j` bound on the form still types a `j` into a text row. A
+  # host that binds printable keys around the form asks `#typing?` or hands
+  # the key over with `#type`.
+  #
   # ### Handing it over
   #
   # A form built with `actions: true`, the default, has a `Submit` and a
@@ -705,6 +711,59 @@ module TermBuf::Widgets
       return unless held
 
       rows.find &.focused?(held)
+    end
+
+    # Whether *key* is one a person types as text: a character with no
+    # `Ctrl`, `Alt` or `Super` held.
+    def self.printable?(key : Key) : Bool
+      key.character? && !key.ctrl? && !key.alt? && !key.super?
+    end
+
+    # Whether the row with the keyboard takes free text, as a text row does.
+    #
+    # A binding on a printable key fires before the row's widget sees the
+    # key. A host that binds one, such as `j` to move down, asks this or
+    # `#type` first so that the letter still goes into a text row.
+    def typing? : Bool
+      focused_row.try(&.typing?) || false
+    end
+
+    # Whether the row with the keyboard takes *key* as text. A number row
+    # takes digits, and a text row takes every printable key.
+    def types?(key : Key) : Bool
+      focused_row.try(&.types?(key)) || false
+    end
+
+    # Hands the key *context* is answering to the row with the keyboard when
+    # the row takes it as text. Answers whether it did.
+    #
+    #     map.bind Key.parse("j"), "the row below",
+    #       ->(context : Context) { form.step_row 1, context unless form.type context }
+    def type(context : Context) : Bool
+      event = context.event
+      return false unless event.is_a? Events::Key
+
+      row = focused_row
+      return false unless row && row.types?(event.key)
+
+      row.press event.key
+      context.consume
+      true
+    end
+
+    # The form's bindings, less any on a printable key the row with the
+    # keyboard takes as text, which the row's widget gets instead.
+    def keymap : Bindings?
+      bound = super
+      row = focused_row
+      return bound unless bound && row
+
+      typed = bound.bindings.select { |binding| row.types? binding.keys.first }
+      return bound if typed.empty?
+
+      kept = Bindings.new
+      bound.bindings.each { |binding| kept.bind binding unless typed.includes? binding }
+      kept
     end
 
     # The keys that move between rows, bound on *form* so an application can

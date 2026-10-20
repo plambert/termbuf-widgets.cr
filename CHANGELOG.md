@@ -29,6 +29,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `form["key"] = value` sets it and sends nothing. `Form::Changed` carries the key and the value of
   every change a person makes. An action row holds no value and emits `Form::Activated` with its
   key on `Enter`, `Space` and a click.
+- `Form#typing?` says whether the row with the keyboard takes free text, and `Form#types?` whether
+  it takes a given key. `Form#type` hands the key being answered to that row and says whether it
+  did, for a host that binds letters around the form.
 - `Form#enable` dims a row and takes it out of the keyboard's path. `Form#note` adds a line under
   the row's help, for a value forced from elsewhere.
 - `examples/form.cr`, a settings form with every row kind beside a dialog form with buttons.
@@ -58,6 +61,9 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Form#values` answers typed values. The text of each row, which `Submitted` carries and the
   form's `#rules` are asked about, is `Form#texts`.
 - `Form#add` takes an optional `help`.
+- A binding on the form's own keymap for a printable key is skipped while the row with the
+  keyboard takes that key as text, so a letter bound for moving between rows still types into a
+  text row.
 - `Router#drain` delivers the messages its own handlers emit in the same drain, for up to
   `Router::PASSES` rounds, and `App#pump` drains again after the events it takes. A widget that
   answers another's message, such as `Form` sending `Form::Changed`, is heard on the same key.

@@ -117,6 +117,17 @@ module TermBuf::Widgets
         false
       end
 
+      # Whether the input takes free text, so that every printable key typed
+      # at it belongs to it.
+      def typing? : Bool
+        false
+      end
+
+      # Whether the input takes *key* as text.
+      def types?(key : Key) : Bool
+        typing? && Form.printable?(key)
+      end
+
       # Hands a key the row keeps to its input.
       def press(key : Key) : Nil
       end
@@ -196,6 +207,14 @@ module TermBuf::Widgets
 
       def text : String?
         @owner.try &.text_of(@widget)
+      end
+
+      # A field and a text area take free text.
+      def typing? : Bool
+        case target
+        when TextArea, Field then true
+        else                      false
+        end
       end
 
       # A field keeps the keys that move its cursor, and a text area keeps
@@ -323,6 +342,15 @@ module TermBuf::Widgets
       def leave : Nil
         @input.settle
       end
+
+      # A number row takes digits and a minus sign.
+      def types?(key : Key) : Bool
+        Form.printable?(key) && (key.char.ascii_number? || key.char == '-')
+      end
+
+      def press(key : Key) : Nil
+        @input.press key
+      end
     end
 
     # A row holding free text, typed into a field.
@@ -362,6 +390,10 @@ module TermBuf::Widgets
 
       def keeps?(key : Key) : Bool
         KEPT.includes? key
+      end
+
+      def typing? : Bool
+        true
       end
 
       def press(key : Key) : Nil

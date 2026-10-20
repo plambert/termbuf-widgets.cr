@@ -607,6 +607,84 @@ Spectator.describe TermBuf::Widgets::Form do
     end
   end
 
+  describe "typing at a row" do
+    # *form* with `j` and `k` bound on its own keymap to move between rows.
+    def lettered(form : Form) : Form
+      letters = TermBuf::Widgets::Bindings.build do |map|
+        map.bind TermBuf::Key.parse("j"), "the row below",
+          ->(context : TermBuf::Widgets::Context) { form.step_row 1, context }
+        map.bind TermBuf::Key.parse("k"), "the row above",
+          ->(context : TermBuf::Widgets::Context) { form.step_row(-1, context) }
+      end
+      form.keymap = Form.row_keys(form).merge letters
+      form
+    end
+
+    it "says whether the row with the keyboard takes free text" do
+      form = settings
+      made = app rooted(form), 40, 10
+      seen = [] of Bool
+
+      4.times do
+        seen << form.typing?
+        Fixtures.presses made, "Down"
+      end
+      seen << form.typing?
+
+      expect(seen).to eq [false, false, false, true, false]
+    end
+
+    it "takes digits on a number row and every printable key on a text row" do
+      form = settings
+      made = app rooted(form), 40, 10
+      2.times { Fixtures.presses made, "Down" }
+      digit = TermBuf::Key.parse_one "5"
+      letter = TermBuf::Key.parse_one "j"
+      on_number = {form.types?(digit), form.types?(letter)}
+      Fixtures.presses made, "Down"
+
+      expect(on_number).to eq({true, false})
+      expect({form.types?(digit), form.types?(letter)}).to eq({true, true})
+      expect(form.types?(TermBuf::Key.parse_one("Ctrl+j"))).to be_false
+    end
+
+    it "lets a printable key bound on the form through to a text row" do
+      form = lettered settings
+      made = app rooted(form), 40, 10
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.press made, "End"
+      Fixtures.type made, "jk"
+
+      expect(form["name"]).to eq "anonjk"
+      expect(form.focused_row.try &.key).to eq "name"
+    end
+
+    it "still fires that binding on a row that does not take text" do
+      form = lettered settings
+      made = app rooted(form), 40, 10
+      Fixtures.type made, "jj"
+
+      expect(form.focused_row.try &.key).to eq "wheel"
+    end
+
+    it "hands a key to a text row for a host binding that asks #type" do
+      form = settings
+      root = rooted form
+      moved = 0
+      root.keymap = TermBuf::Widgets::Bindings.build do |map|
+        map.bind TermBuf::Key.parse("j"), "the row below",
+          ->(context : TermBuf::Widgets::Context) { moved += 1 unless form.type context; nil }
+      end
+      made = app root, 40, 10
+      Fixtures.type made, "j"
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.type made, "j"
+
+      expect(moved).to eq 1
+      expect(changes root).to eq [{"name", "anonj"}] of {String, Form::Value}
+    end
+  end
+
   describe "moving between rows" do
     it "moves down and up, skipping headers and stopping at the ends" do
       form = settings
