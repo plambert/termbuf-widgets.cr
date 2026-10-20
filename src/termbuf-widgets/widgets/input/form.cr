@@ -1,6 +1,8 @@
 require "../../message"
 require "../../router"
 require "../../widget"
+require "../depth"
+require "../display/attached"
 require "../field"
 require "../label"
 require "../panel"
@@ -12,6 +14,7 @@ require "./text_area"
 require "./validated_field"
 require "./validators"
 require "./form/choice"
+require "./form/color"
 require "./form/parts"
 require "./form/rows"
 require "./form/schema"
@@ -30,9 +33,11 @@ module TermBuf::Widgets
   #     form.section "Input" do |section|
   #       section.number "wheel", "Cells per wheel notch", value: 3, range: 1..10
   #       section.text "name", "Tester name", value: "anonymous"
+  #       section.color "accent", "Accent", Color.rgb(0x3080C0)
   #       section.action "keys", "Key bindings", hint: "Enter to open"
   #     end
   #     root.add form
+  #     form.attach app
   #
   # A form can also be built by hand from widgets with `#add`, each held to a
   # list of rules:
@@ -50,6 +55,14 @@ module TermBuf::Widgets
   # `form["motion"] = false` sets it and sends nothing. Every change a person
   # makes to a schema row emits `Changed` with the key and the new value. An
   # action row holds no value. Pressing it emits `Activated` with its key.
+  #
+  # ### Colors
+  #
+  # A color row draws a `ColorSwatch`, and `Enter`, `Space` or a click opens a
+  # `ColorPicker` over the form. See `ColorRow` for where it opens and how it
+  # closes. The picker opens on the application's screen, so a form with
+  # color rows is given the application with `#attach`. `#depth` is how many
+  # colors every color row offers unless the row names its own.
   #
   # ### Layout
   #
@@ -87,6 +100,7 @@ module TermBuf::Widgets
   # `#submit_on_enter?` makes `Enter` in any field do what `Submit` does. It is
   # on by default for a form with buttons and off for one without.
   class Form < Widget
+    include Attached
     include Interactive
     include Schema
 
@@ -243,6 +257,9 @@ module TermBuf::Widgets
     # How many rows to keep in view around the row with the keyboard.
     property scroll_margin : Scrolls::Margin = Scrolls::Margin.rows(1)
 
+    # How many colors a color row offers unless it names its own depth.
+    getter depth : Depth
+
     # What a widget the form does not otherwise know contributes as text, or
     # `nil` for one that contributes nothing. Set this to take in a widget of
     # your own.
@@ -260,6 +277,7 @@ module TermBuf::Widgets
                    help_style : Style = Style::DEFAULT.italic,
                    note_style : Style = Style::DEFAULT.bold,
                    narrow : Int32 = 24,
+                   depth : Depth = Depth::TrueColor,
                    width : Layout::Sizing = Layout::Sizing.grow,
                    height : Layout::Sizing = Layout::Sizing.grow,
                    style : Style? = nil)
@@ -271,6 +289,7 @@ module TermBuf::Widgets
       @help_style = help_style
       @note_style = note_style
       @narrow = narrow
+      @depth = depth
       @width = width
       @height = height
       @style = style
@@ -432,6 +451,13 @@ module TermBuf::Widgets
       @label_width = width
       square_up
       width
+    end
+
+    # Offers *depth* in every color row that does not name its own.
+    def depth=(depth : Depth) : Depth
+      @depth = depth
+      rows.each { |row| row.as?(ColorRow).try &.refresh_depth }
+      depth
     end
 
     # Sets what the section headers are drawn in.
@@ -817,6 +843,8 @@ module TermBuf::Widgets
         entered context
       when ValidatedField::Invalid
         entered context
+      when Dialog::Closed
+        context.consume if rows.any? { |row| row.as?(ColorRow).try &.owns?(event.dialog) }
       else
         changed event, context
       end

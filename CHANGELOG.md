@@ -17,8 +17,14 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `#typing` is called after every edit with the typed number, or `nil` when the text is not a
   whole number in the range.
 - `Form` can be built from a schema. `#section` adds a header and its rows, and `toggle`, `choice`,
-  `number`, `text` and `action` each add one row with a key, a label and an optional `help`. Rows
-  given outside a section go in an unnamed section at the top.
+  `number`, `text`, `color` and `action` each add one row with a key, a label and an optional
+  `help`. Rows given outside a section go in an unnamed section at the top.
+- A `color` row draws a `ColorSwatch`. `Enter`, `Space` and a click open a `ColorPicker` in a
+  popover under the row, or in a dialog when the popover fits neither under nor over it. Each
+  change applies at once and emits `Form::Changed`. `Enter` closes the picker and keeps the color,
+  and `Escape` closes it and puts back the color it opened on. `Form.new depth:` sets the `Depth`
+  for every color row, and `depth:` on the row overrides it. A form with color rows needs
+  `Form#attach app`.
 - `Form#values` answers every row's value by key as a `Form::Value`. `form["key"]` reads one and
   `form["key"] = value` sets it and sends nothing. `Form::Changed` carries the key and the value of
   every change a person makes. An action row holds no value and emits `Form::Activated` with its

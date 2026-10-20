@@ -1,12 +1,13 @@
 require "../../app"
 
 module TermBuf::Widgets
-  # The application a widget was handed, for the two things a widget cannot
-  # reach on its own: a clock and the clipboard.
+  # The application a widget was handed, for what a widget cannot reach on its
+  # own: a clock, the clipboard, and the screen an overlay opens on.
   #
-  # Neither belongs to the widget layer. `App#after` and `App#copy` are procs
-  # an application wires to its terminal, and a widget that wants one is given
-  # the application rather than the device:
+  # None of these belongs to the widget layer. `App#after` and `App#copy` are
+  # procs an application wires to its terminal, `Overlay#open` takes the
+  # application, and a widget that wants one is given the application rather
+  # than the device:
   #
   #     spinner.attach app
   #

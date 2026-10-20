@@ -1,5 +1,6 @@
 require "../../../widget"
 require "../../label"
+require "./color"
 require "./rows"
 
 module TermBuf::Widgets
@@ -40,6 +41,14 @@ module TermBuf::Widgets
       def text(key : String, label : String, value : String = "",
                help : String? = nil, placeholder : String? = nil) : TextRow
         add_row(TextRow.new(key, label, value, help, placeholder)).as(TextRow)
+      end
+
+      # A row holding a color, drawn as a swatch. `Enter` and `Space` open a
+      # `ColorPicker` on it. *depth* is how many colors the picker offers, or
+      # `nil` for the form's `Form#depth`.
+      def color(key : String, label : String, value : Color, help : String? = nil,
+                depth : Depth? = nil) : ColorRow
+        add_row(ColorRow.new(key, label, value, depth, help)).as(ColorRow)
       end
 
       # A row that is a thing to do. Pressing it emits `Form::Activated`.

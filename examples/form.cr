@@ -6,7 +6,9 @@
 #
 # Up and Down move between rows in a form, and Tab moves through the rows and on
 # into the other form. Space toggles, Left and Right move a choice or step a
-# number, Enter or Space presses an action row, and typing edits a text row. The
+# number, Enter or Space presses an action row, and typing edits a text row.
+# Enter or Space on the accent color opens a picker under it, or in a dialog
+# when there is no room. Enter keeps the color and Escape puts it back. The
 # settings form is taller than its window on a short terminal, so it scrolls as
 # the keyboard moves. The line at the bottom says what the last message was.
 # Ctrl+Q leaves.
@@ -32,6 +34,7 @@ def expected : Widgets::Widget
     "The line under the rows shows the help of the row with the keyboard.",
     "Space toggles, Left and Right move a choice or step a number.",
     "Enter or Space on 'Key bindings' or 'Reset' says Activated below.",
+    "Enter on 'Accent' opens a picker; each change says Changed. Escape puts it back.",
     "Shrink the terminal: the settings scroll and a scrollbar shows on the right.",
     "Submit with an empty name: the summary names it. Ctrl+Q leaves.",
   ]
@@ -64,6 +67,8 @@ def settings : Widgets::Form
     section.choice "theme", "Theme",
       [{"dark", "Dark"}, {"light", "Light"}, {"contrast", "High contrast"}],
       value: "contrast", help: "A choice too wide for the row stacks its labels."
+    section.color "accent", "Accent", TermBuf::Color.rgb(0x3080C0),
+      help: "Enter opens a picker. Enter keeps the color and Escape puts it back."
   end
 
   form.section "Input" do |section|
@@ -127,7 +132,8 @@ TermBuf::Terminal.open do |terminal|
     padding: Widgets::Layout::Padding.symmetric(horizontal: 1),
     border: Widgets::Border.rounded(title: " settings ", style: accent)
   left.focused_border_style = accent.bold
-  left.add settings
+  settings_form = settings
+  left.add settings_form
 
   right = Widgets::Panel.new direction: Widgets::Layout::Direction::Column,
     height: Widgets::Layout::Sizing.grow,
@@ -159,6 +165,9 @@ TermBuf::Terminal.open do |terminal|
   app = Widgets::App.new terminal, root,
     TermBuf::Rect.full(terminal.size.columns, terminal.size.rows),
     terminal.events, terminal.policy, keymap
+
+  # The color row opens its picker over the screen, so it needs the app.
+  settings_form.attach app
 
   # A click on a row presses it, and the wheel scrolls the settings.
   terminal.enable TermBuf::Tty::MOUSE_SGR

@@ -537,10 +537,15 @@ disabled control is out of the tab order and answers nothing, but is still drawn
 when it cannot be used tells the user less than one that is visibly unavailable. A group that
 refuses a toggle puts it back and says `Refused` rather than `Changed`.
 
-A settings form is described as data. Each row has a key, a label and an optional help line, and
-the form answers `#values` by key, typed as `Bool`, `Int32` or `String`. Every change a person makes
-emits `Form::Changed` with the key and the value. An `action` row holds nothing and emits
-`Form::Activated` when it is pressed.
+A settings form is described as data. The rows are `toggle`, `choice`, `number`, `text`, `color`
+and `action`. Each has a key, a label and an optional help line, and the form answers `#values` by
+key, typed as `Bool`, `Int32`, `String` or `Color`. Every change a person makes emits
+`Form::Changed` with the key and the value. An `action` row holds nothing and emits
+`Form::Activated` when it is pressed. A `color` row draws a `ColorSwatch`, and `Enter` opens a
+`ColorPicker` under it, or in a dialog when there is no room. Each change in the picker applies at
+once, `Enter` keeps it and `Escape` puts the color back. The picker opens over the screen, so a
+form with color rows is handed the app with `form.attach app`. `Form.new depth:` sets the `Depth`
+every color row offers.
 
 ```crystal
 form = Widgets::Form.new actions: false
@@ -551,9 +556,11 @@ end
 form.section "Input" do |section|
   section.number "wheel", "Cells per wheel notch", value: 3, range: 1..10
   section.text "name", "Tester name", value: "anonymous"
+  section.color "accent", "Accent", TermBuf::Color.rgb(0x3080C0)
   section.action "keys", "Key bindings", hint: "Enter to open"
 end
 form["motion"] = false # sets it and sends nothing
+form.attach app        # the color row's picker opens on the app's screen
 ```
 
 The rows scroll in their own window, `Up` and `Down` move between them, and the help of the row
