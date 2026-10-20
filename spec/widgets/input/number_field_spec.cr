@@ -176,6 +176,35 @@ Spectator.describe TermBuf::Widgets::NumberField do
       expect(field.text).to eq "5"
     end
 
+    it "calls the typing hook after each edit with the number or nil" do
+      field = NumberField.new value: 5, range: 0..100
+      heard = [] of Int32?
+      field.typing = ->(number : Int32?) { heard << number; nil }
+      root = rooted field
+      made = app root
+      Fixtures.presses made, "Backspace"
+      Fixtures.type made, "4x"
+      Fixtures.presses made, "Backspace"
+      Fixtures.type made, "2"
+      Fixtures.type made, "0"
+      Fixtures.settle made
+
+      expect(heard).to eq [nil, 4, nil, 4, 42, nil]
+      expect(field.value).to eq 5
+      expect(root.of(NumberField::Changed)).to be_empty
+    end
+
+    it "does not call the typing hook on a step or a key that changes nothing" do
+      field = NumberField.new value: 5, range: 0..100
+      heard = [] of Int32?
+      field.typing = ->(number : Int32?) { heard << number; nil }
+      made = app rooted(field)
+      Fixtures.presses made, "Right"
+      Fixtures.presses made, "Delete"
+
+      expect(heard).to be_empty
+    end
+
     it "sends Accepted after the value" do
       field = NumberField.new value: 5, range: 0..100
       root = rooted field

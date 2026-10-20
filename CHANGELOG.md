@@ -14,6 +14,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   and held to the range, and text that is not an integer is put back. `NumberField::Changed`
   carries the value at every step that moves it and every accept. `#bar = true` draws a filled bar
   beside the number. `up_down: false` leaves `Up` and `Down` to whatever contains the field.
+  `#typing` is called after every edit with the typed number, or `nil` when the text is not a
+  whole number in the range.
 - `Form` can be built from a schema. `#section` adds a header and its rows, and `toggle`, `choice`,
   `number`, `text` and `action` each add one row with a key, a label and an optional `help`. Rows
   given outside a section go in an unnamed section at the top.
