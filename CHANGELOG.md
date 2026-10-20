@@ -31,11 +31,11 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `ColorSwatch`, one row with a bar in the color and its value, `#rrggbb`, with the palette index
   after it at `Indexed256`. On a narrow row the value is written over the bar in black or white,
   whichever reads better. On a narrower row the bar is drawn alone.
-- `ColorPicker`, a swatch, a grid of the 256 color cube and greys, and fields for red, green, blue
-  and hex. The arrows, `Enter`, `Space` and a click choose from the grid. Typing in a field moves
-  the value. `Tab` moves between the grid and the fields. At `Indexed256` the grid adds the 16
-  system colors, and a field edit snaps to the nearest index. `#reset_to` adds a "default" cell.
-  Each change emits `ColorPicker::Changed`.
+- `ColorPicker`, a swatch, a grid of the 256 color cube and greys, a `NumberField` each for red,
+  green and blue, and a hex field. The arrows, `Enter`, `Space` and a click choose from the grid.
+  Typing in a field moves the value. `Tab` moves between the grid and the fields. At `Indexed256`
+  the grid adds the 16 system colors, and a field edit snaps to the nearest index. `#reset_to`
+  adds a "default" cell. Each change emits `ColorPicker::Changed`.
 - `examples/color.cr`, a picker with two swatches that follow it.
 
 ### Changed

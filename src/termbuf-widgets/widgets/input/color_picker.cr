@@ -6,6 +6,7 @@ require "../display/color_swatch"
 require "../field"
 require "../panel"
 require "./interactive"
+require "./number_field"
 
 module TermBuf::Widgets
   # Somewhere to choose a color, from a grid or by its value.
@@ -39,9 +40,10 @@ module TermBuf::Widgets
   #
   # ### The fields
   #
-  # Each channel field takes a number from 0 to 255. `Up` and `Right` step it
-  # up, `Down` and `Left` step it down, and `Home` and `End` go to 0 and 255.
-  # `Enter` clamps what was typed. The hex field takes `#rrggbb` or `rrggbb`.
+  # Each channel field is a `NumberField` from 0 to 255. `Up` and `Right` step
+  # it up, `Down` and `Left` step it down, and `Home` and `End` go to 0 and
+  # 255. `Enter` clamps what was typed, and puts text that is not a number
+  # back to the field's last value. The hex field takes `#rrggbb` or `rrggbb`.
   # Typing in any field moves the value as soon as the text is a whole color,
   # and the swatch, the grid's cursor and the other fields follow.
   #
@@ -118,123 +120,6 @@ module TermBuf::Widgets
 
       private def restore(before : String) : Nil
         self.text = before
-      end
-    end
-
-    # A field holding one integer in a range, stepped with the arrows.
-    #
-    # It has the surface `NumberField` is to have, so the picker can take
-    # that instead with a change of type. `#on_change` is the one addition.
-    # The picker follows the text as it is typed, and `Changed` is sent only
-    # for a step and for `Enter`.
-    class ChannelField < Field
-      # The value was stepped or accepted.
-      struct Changed < Message
-        # Which field it was.
-        getter field : ChannelField
-
-        # The value it now holds.
-        getter value : Int32
-
-        def initialize(@field : ChannelField, @value : Int32)
-        end
-      end
-
-      # The values the field may hold.
-      getter range : Range(Int32, Int32)
-
-      # How far one press of an arrow moves the value.
-      getter step : Int32
-
-      # Called after any key or paste that changed the text.
-      property on_change : Proc(Nil)? = nil
-
-      @value : Int32
-
-      def initialize(value : Int32 = 0, @range : Range(Int32, Int32) = 0..255,
-                     @step : Int32 = 1, prompt : String = "")
-        super prompt: Field::Prompt.new(prompt)
-        @value = value.clamp @range
-        self.text = @value.to_s
-
-        # A fixed field keeps a column spare at each end for its scroll
-        # markers.
-        digits = {@range.begin.to_s.size, @range.end.to_s.size}.max
-        self.width = Layout::Sizing.fixed prompt.size + digits + 2
-        self.height = Layout::Sizing.fixed 1
-        self.keymap = stepping
-      end
-
-      # The value, as last set, stepped or accepted.
-      def value : Int32
-        @value
-      end
-
-      # Sets the value without saying so, held to `#range`.
-      def value=(value : Int32) : Int32
-        @value = value.clamp @range
-        self.text = @value.to_s unless text == @value.to_s
-        @value
-      end
-
-      # What the text says, or `nil` when it is not a number in `#range`.
-      def typed : Int32?
-        number = text.to_i?
-        number if number && @range.includes?(number)
-      end
-
-      # Moves the value *steps* steps from what is typed, held to `#range`,
-      # and says so.
-      def step_by(steps : Int32) : Nil
-        go_to (typed || @value) + steps * @step
-      end
-
-      # Sets the value to *value*, held to `#range`, and says so.
-      def go_to(value : Int32) : Nil
-        self.value = value
-        emit Changed.new(self, @value)
-      end
-
-      # Takes what is typed, clamped to `#range`, and says so. Text that is
-      # not a number is put back to the value.
-      def accept : Nil
-        go_to text.to_i? || @value
-      end
-
-      # Takes the key the way a field does. A key that leaves anything but
-      # digits is undone.
-      def press(key : Key) : Nil
-        before = text
-        super
-        changed before
-      end
-
-      # :ditto:
-      def paste(text : String) : Nil
-        before = self.text
-        super
-        changed before
-      end
-
-      private def changed(before : String) : Nil
-        return if text == before
-        return self.text = before unless text.each_char.all?(&.ascii_number?)
-
-        @on_change.try &.call
-      end
-
-      private def stepping : Bindings
-        Bindings.build do |map|
-          map.bind Key.parse("Up"), "step up", ->(_context : Context) { step_by 1 }
-          map.bind Key.parse("Right"), "step up", ->(_context : Context) { step_by 1 }
-          map.bind Key.parse("Down"), "step down", ->(_context : Context) { step_by(-1) }
-          map.bind Key.parse("Left"), "step down", ->(_context : Context) { step_by(-1) }
-          map.bind Key.parse("Home"), "the least value",
-            ->(_context : Context) { go_to @range.begin }
-          map.bind Key.parse("End"), "the greatest value",
-            ->(_context : Context) { go_to @range.end }
-          map.bind Key.parse("Enter"), "take what is typed", ->(_context : Context) { accept }
-        end
       end
     end
 
@@ -485,13 +370,13 @@ module TermBuf::Widgets
     getter grid : Grid
 
     # The red field.
-    getter red : ChannelField
+    getter red : NumberField
 
     # The green field.
-    getter green : ChannelField
+    getter green : NumberField
 
     # The blue field.
-    getter blue : ChannelField
+    getter blue : NumberField
 
     # The row the three channel fields sit in.
     getter channels : Panel
@@ -522,9 +407,9 @@ module TermBuf::Widgets
 
       @swatch = ColorSwatch.new @value, depth: depth
       @grid = Grid.new depth, reset_to
-      @red = ChannelField.new prompt: "R "
-      @green = ChannelField.new prompt: "G "
-      @blue = ChannelField.new prompt: "B "
+      @red = channel_field "R "
+      @green = channel_field "G "
+      @blue = channel_field "B "
       @hex = Entry.new "Hex ", 7, HEX
       @channels = Panel.new direction: Layout::Direction::Row,
         height: Layout::Sizing.fixed(1), gap: 2
@@ -603,10 +488,13 @@ module TermBuf::Widgets
     # Claims what the fields say, and takes a click on a field.
     def handle(event : Event, context : Context) : Nil
       case event
-      when ChannelField::Changed
+      when NumberField::Changed
         context.consume
         channel_moved event.field, event.value
-      when Field::Accepted, Field::Cancelled, Field::EndOfInput
+      when Field::Cancelled
+        context.consume
+        settle
+      when Field::Accepted, Field::EndOfInput
         context.consume
       when Events::Mouse
         click_field event, context
@@ -626,11 +514,17 @@ module TermBuf::Widgets
 
     # ------------------------------------------------------------- editing
 
+    private def channel_field(prompt : String) : NumberField
+      field = NumberField.new range: 0..255
+      field.prompt = Field::Prompt.new prompt
+      field
+    end
+
     private def wire : Nil
       @grid.on_take = ->(color : Color) { take color; nil }
 
       {@red, @green, @blue}.each do |field|
-        field.on_change = -> { channel_edited field; nil }
+        field.typing = ->(_level : Int32?) { channel_edited field; nil }
       end
       @hex.on_change = -> { hex_edited; nil }
       @hex.keymap = Bindings.build do |map|
@@ -643,7 +537,7 @@ module TermBuf::Widgets
       change color, nil
     end
 
-    private def channel_edited(field : ChannelField) : Nil
+    private def channel_edited(field : NumberField) : Nil
       @editing = field
       levels = typed_channels
       change Color.rgb(*levels), field if levels
@@ -658,9 +552,9 @@ module TermBuf::Widgets
     # The three channel fields as numbers, or `nil` while one is not a
     # channel.
     private def typed_channels : {Int32, Int32, Int32}?
-      red = @red.typed
-      green = @green.typed
-      blue = @blue.typed
+      red = @red.typed_in_range
+      green = @green.typed_in_range
+      blue = @blue.typed_in_range
       {red, green, blue} if red && green && blue
     end
 
@@ -671,7 +565,7 @@ module TermBuf::Widgets
     # A step that does, in a field with nothing typed in it, goes on along
     # the palette's cube levels in the same direction until the index moves.
     # After typing, a step or an `Enter` takes the nearest index and settles.
-    private def channel_moved(field : ChannelField, level : Int32) : Nil
+    private def channel_moved(field : NumberField, level : Int32) : Nil
       which = {@red, @green, @blue}.index!(&.same?(field))
       levels = @value.channels.to_a
       before = levels[which]
