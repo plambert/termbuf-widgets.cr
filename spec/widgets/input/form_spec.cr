@@ -316,4 +316,547 @@ Spectator.describe TermBuf::Widgets::Form do
       expect(root.of(Form::Submitted)).to be_empty
     end
   end
+
+  # A form of every schema kind but color, in two sections, with no buttons.
+  def settings : Form
+    form = Form.new actions: false
+    form.section "Display" do |section|
+      section.toggle "motion", "Animate", value: true, help: "Panels slide."
+      section.choice "bars", "Bars", %w[gradient bands], value: "gradient"
+    end
+    form.section "Input" do |section|
+      section.number "wheel", "Wheel", value: 3, range: 1..10
+      section.text "name", "Name", value: "anon"
+      section.action "keys", "Keys", hint: "Enter to open", help: "Lists the keys."
+    end
+    form
+  end
+
+  def changes(root : Log) : Array({String, Form::Value})
+    root.of(Form::Changed).map { |change| {change.key, change.value} }
+  end
+
+  # A form of *count* toggles in one section, to be taller than its window.
+  def tall(count : Int32) : {Form, Array(TermBuf::Widgets::Checkbox)}
+    form = Form.new actions: false
+    boxes = [] of TermBuf::Widgets::Checkbox
+    form.section "Many" do |section|
+      count.times { |index| boxes << section.toggle("row#{index}", "Row #{index}").input }
+    end
+    {form, boxes}
+  end
+
+  # Whether *widget* sits wholly inside the window of *form*.
+  def in_view?(form : Form, widget : TermBuf::Widgets::Widget) : Bool
+    window = form.fields.content
+    box = widget.rect
+    box.y >= window.y && box.y + box.height <= window.y + window.height
+  end
+
+  describe "a schema" do
+    it "builds the rows in order, with their sections" do
+      form = settings
+
+      expect(form.rows.map &.key).to eq %w[motion bars wheel name keys]
+      expect(form.sections.compact_map &.name).to eq %w[Display Input]
+    end
+
+    it "draws a header for each section and a blank line between them" do
+      made = app rooted(settings), 40, 10
+
+      expect(Fixtures.frame(made)).to eq [
+        "Display",
+        "Animate ☑",
+        "Bars    (•) gradient  ( ) bands",
+        "",
+        "Input",
+        "Wheel   3",
+        "Name    anon",
+        "Keys    Enter to open",
+        "Panels slide.",
+        "",
+      ]
+    end
+
+    it "puts rows given outside any section in an unnamed one at the top" do
+      form = settings
+      form.toggle "first", "First"
+
+      expect(form.rows.map(&.key).first).to eq "first"
+      expect(Fixtures.render(rooted(form), 40, 12)[0]).to eq "First   ☐"
+    end
+
+    it "refuses a key it already has" do
+      form = settings
+
+      expect { form.toggle "motion", "Again" }.to raise_error(ArgumentError)
+    end
+
+    it "takes a choice as values and labels" do
+      form = Form.new actions: false
+      form.choice "size", "Size", [{"s", "Small"}, {"l", "Large"}], value: "l"
+
+      expect(form["size"]).to eq "l"
+      expect(Fixtures.render(rooted(form), 40, 2)[0]).to eq "Size ( ) Small  (•) Large"
+    end
+
+    it "has no buttons and no submit on Enter when built without actions" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      4.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Enter"
+
+      expect(form.actions?).to be_false
+      expect(form.submit_on_enter?).to be_false
+      expect(root.of(Form::Submitted)).to be_empty
+    end
+  end
+
+  describe "the values" do
+    it "answers each row's value by key, typed, with no entry for an action" do
+      expect(settings.values).to eq({"motion" => true, "bars" => "gradient", "wheel" => 3,
+                                     "name" => "anon"} of String => Form::Value)
+    end
+
+    it "answers them as text for the submit path" do
+      expect(settings.texts).to eq({"motion" => "true", "bars" => "gradient", "wheel" => "3",
+                                    "name" => "anon"})
+    end
+
+    it "reads and sets one by key, and sends nothing for a value set" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      form["motion"] = false
+      form["bars"] = "bands"
+      form["wheel"] = 7
+      form["name"] = "yakko"
+      Fixtures.settle made
+
+      expect(form["motion"]).to eq false
+      expect(form["wheel"]).to eq 7
+      expect(form["keys"]).to be_nil
+      expect(root.of(Form::Changed)).to be_empty
+      expect(Fixtures.frame(made)[2]).to eq "Bars    ( ) gradient  (•) bands"
+    end
+
+    it "refuses a value of the wrong kind" do
+      form = settings
+
+      expect { form["motion"] = "yes" }.to raise_error(ArgumentError)
+      expect { form["nothing"] = true }.to raise_error(KeyError)
+    end
+
+    it "hands the schema rows over as text in a form with buttons" do
+      form = Form.new
+      form.toggle "wrap", "Wrap", value: true
+      form.add "name", Field.new
+      root = rooted form
+      made = app root
+      form.submit
+      Fixtures.settle made
+
+      expect(root.of(Form::Submitted).first.values).to eq({"wrap" => "true", "name" => ""})
+    end
+  end
+
+  describe "each kind" do
+    it "toggles on Space and says so" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.presses made, "Space"
+
+      expect(changes root).to eq [{"motion", false}]
+      expect(Fixtures.frame(made)[1]).to eq "Animate ☐"
+    end
+
+    it "moves an inline choice on Left and Right and says so" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.presses made, "Down"
+      Fixtures.presses made, "Right"
+      Fixtures.presses made, "Right"
+      Fixtures.presses made, "Left"
+
+      expect(changes root).to eq [{"bars", "bands"}, {"bars", "gradient"}]
+    end
+
+    it "takes the label clicked in a choice" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.click made, 24, 2
+
+      expect(changes root).to eq [{"bars", "bands"}]
+      expect(form.focused_row.try &.key).to eq "bars"
+    end
+
+    it "stacks a choice whose labels do not fit on one line" do
+      form = Form.new actions: false, label_position: Form::LabelPosition::Left
+      form.choice "bars", "Bars", %w[gradient bands], value: "bands"
+
+      expect(Fixtures.render(rooted(form), 20, 3)).to eq ["Bars ( ) gradient", "     (•) bands", ""]
+    end
+
+    it "steps a number on Left and Right and says so" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      2.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Right"
+      Fixtures.presses made, "Right"
+      Fixtures.presses made, "Left"
+
+      expect(changes root).to eq [{"wheel", 4}, {"wheel", 5}, {"wheel", 4}]
+    end
+
+    it "takes a typed number when the keyboard leaves the row" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      2.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Backspace"
+      Fixtures.type made, "9"
+      Fixtures.presses made, "Down"
+      Fixtures.settle made
+
+      expect(form["wheel"]).to eq 9
+      expect(changes(root).last).to eq({"wheel", 9})
+    end
+
+    it "says what a text row holds at every key" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.type made, "y"
+      Fixtures.settle made
+      Fixtures.presses made, "Backspace"
+
+      expect(changes root).to eq [{"name", "anony"}, {"name", "anon"}]
+    end
+
+    it "leaves Home and End to a text row's cursor" do
+      form = settings
+      made = app rooted(form), 40, 10
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Home"
+      Fixtures.type made, "x"
+      Fixtures.settle made
+
+      expect(form["name"]).to eq "xanon"
+      expect(form.focused_row.try &.key).to eq "name"
+    end
+
+    it "keeps the line in a text row on Enter" do
+      form = settings
+      made = app rooted(form), 40, 10
+      3.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Enter"
+
+      expect(form["name"]).to eq "anon"
+    end
+
+    it "activates an action row on Enter, Space and a click, with its key" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      4.times { Fixtures.presses made, "Down" }
+      Fixtures.presses made, "Enter"
+      Fixtures.presses made, "Space"
+      Fixtures.click made, 10, 7
+      Fixtures.click made, 1, 7
+
+      expect(root.of(Form::Activated).map &.key).to eq %w[keys keys keys keys]
+      expect(form.values.has_key?("keys")).to be_false
+    end
+
+    it "toggles a row whose label is clicked" do
+      form = settings
+      root = rooted form
+      made = app root, 40, 10
+      Fixtures.presses made, "Down"
+      Fixtures.click made, 1, 1
+
+      expect(changes root).to eq [{"motion", false}]
+      expect(form.focused_row.try &.key).to eq "motion"
+    end
+  end
+
+  describe "moving between rows" do
+    it "moves down and up, skipping headers and stopping at the ends" do
+      form = settings
+      made = app rooted(form), 40, 10
+      keys = [] of String?
+
+      6.times do
+        keys << form.focused_row.try &.key
+        Fixtures.presses made, "Down"
+      end
+      keys << form.focused_row.try &.key
+      Fixtures.presses made, "Up"
+      keys << form.focused_row.try &.key
+
+      expect(keys).to eq %w[motion bars wheel name keys keys keys name]
+    end
+
+    it "goes to the first and last row on Home and End" do
+      form = settings
+      made = app rooted(form), 40, 10
+      Fixtures.presses made, "End"
+      expect(form.focused_row.try &.key).to eq "keys"
+
+      Fixtures.presses made, "Home"
+      expect(form.focused_row.try &.key).to eq "motion"
+    end
+
+    it "moves through the focus ring on Tab" do
+      form = settings
+      made = app rooted(form), 40, 10
+      Fixtures.presses made, "Tab"
+      Fixtures.presses made, "Tab"
+      expect(form.focused_row.try &.key).to eq "wheel"
+
+      Fixtures.presses made, "Shift+Tab"
+      expect(form.focused_row.try &.key).to eq "bars"
+    end
+
+    it "goes from the buttons back to the last row on Up" do
+      form = Form.new
+      form.toggle "one", "One"
+      form.toggle "two", "Two"
+      made = app rooted(form), 30, 6
+      Fixtures.presses made, "Tab"
+      Fixtures.presses made, "Tab"
+      expect(made.focused).to be form.submit_button
+
+      Fixtures.presses made, "Up"
+      expect(form.focused_row.try &.key).to eq "two"
+    end
+
+    it "shows the help of the row with the keyboard" do
+      form = settings
+      made = app rooted(form), 40, 10
+      expect(Fixtures.frame(made)[8]).to eq "Panels slide."
+
+      Fixtures.presses made, "Down"
+      expect(Fixtures.frame(made)[8]).to eq ""
+
+      Fixtures.presses made, "End"
+      expect(Fixtures.frame(made)[8]).to eq "Lists the keys."
+    end
+
+    it "shows a note under the help" do
+      form = settings
+      form.note "motion", "Set by the server."
+      made = app rooted(form), 40, 11
+
+      expect(Fixtures.frame(made)[8..9]).to eq ["Panels slide.", "Set by the server."]
+    end
+
+    it "leaves the help line out when no row has help" do
+      form = Form.new actions: false
+      form.toggle "one", "One"
+      form.toggle "two", "Two"
+
+      expect(Fixtures.render(rooted(form), 30, 3)).to eq ["One ☐", "Two ☐", ""]
+    end
+  end
+
+  describe "a form taller than its window" do
+    it "scrolls the row with the keyboard into view on every move down" do
+      form, boxes = tall 12
+      made = app rooted(form), 30, 6
+
+      11.times do
+        Fixtures.presses made, "Down"
+        made.frame
+        held = made.focused
+        expect(held && in_view?(form, held)).to be_true
+      end
+      expect(made.focused).to be boxes.last
+    end
+
+    it "scrolls it into view on every move back up" do
+      form, boxes = tall 12
+      made = app rooted(form), 30, 6
+      Fixtures.presses made, "End"
+      made.frame
+
+      11.times do
+        Fixtures.presses made, "Up"
+        made.frame
+        held = made.focused
+        expect(held && in_view?(form, held)).to be_true
+      end
+      expect(made.focused).to be boxes.first
+      expect(form.fields.scroll_y).to eq 0
+    end
+
+    it "keeps a row of margin past the row with the keyboard" do
+      form, boxes = tall 12
+      made = app rooted(form), 30, 6
+      3.times { Fixtures.presses made, "Down" }
+      made.frame
+
+      expect(boxes[4].rect.y).to be < form.fields.content.y + form.fields.content.height
+    end
+
+    it "lands on the last row on PageDown from the last page" do
+      form, boxes = tall 12
+      made = app rooted(form), 30, 6
+      4.times do
+        Fixtures.presses made, "PageDown"
+        made.frame
+      end
+
+      expect(made.focused).to be boxes.last
+      expect(in_view?(form, boxes.last)).to be_true
+    end
+
+    it "moves a window's worth on PageDown and back on PageUp" do
+      form, boxes = tall 12
+      made = app rooted(form), 30, 6
+      Fixtures.presses made, "PageDown"
+      made.frame
+      landed = boxes.index(&.same?(made.focused)) || 0
+
+      expect(landed).to be > 1
+      expect(made.focused.try { |held| in_view?(form, held) }).to be_true
+
+      Fixtures.presses made, "PageUp"
+      made.frame
+      expect(made.focused).to be boxes.first
+    end
+
+    it "draws the scrollbar only while the rows overflow" do
+      form, _ = tall 12
+      made = app rooted(form), 30, 6
+      lines = Fixtures.frame(made)
+
+      expect(lines[0][29]?).to eq '█'
+
+      short, _ = tall 2
+      expect(Fixtures.render(rooted(short), 30, 6).none? &.includes?('│')).to be_true
+    end
+
+    it "scrolls on the wheel" do
+      form, _ = tall 12
+      made = app rooted(form), 30, 6
+      Fixtures.mouse made, TermBuf::Input::Mouse::Action::Press, 2, 2,
+        TermBuf::Input::Mouse::Button::WheelDown
+
+      expect(form.fields.scroll_y).to eq 3
+    end
+
+    it "keeps its buttons on the screen" do
+      form = Form.new
+      8.times { |index| form.toggle "row#{index}", "Row #{index}" }
+      lines = Fixtures.render rooted(form), 30, 5
+
+      expect(lines[4]).to contain "Submit"
+    end
+
+    it "is as tall as its rows when it is told to fit" do
+      form, _ = tall 3
+      form.height = Sizing.fit
+      Fixtures.render rooted(form), 30, 10
+
+      expect(form.rect.height).to eq 4
+    end
+  end
+
+  describe "a narrow form" do
+    it "puts the labels above the inputs" do
+      form = Form.new actions: false
+      form.toggle "motion", "Animate"
+      form.text "name", "Name", value: "anon"
+      made = app rooted(form), 16, 5
+
+      expect(Fixtures.frame(made)).to eq ["Animate", "☐", "Name", "anon", ""]
+    end
+
+    it "stays inside its parent when a label is wider than the form" do
+      form = Form.new actions: false
+      form.choice "bars", "Bar color for the panels", %w[gradient bands], value: "bands"
+      lines = Fixtures.render rooted(form), 16, 4
+
+      expect(form.rect.width).to eq 16
+      expect(lines).to eq ["Bar color for t", "( ) gradient", "(•) bands", ""]
+    end
+
+    it "puts them beside again when it is wide enough" do
+      form = Form.new actions: false
+      form.toggle "motion", "Animate"
+      made = app rooted(form), 16, 3
+      made.resized 30, 3
+      made.pump
+
+      expect(Fixtures.frame(made)[0]).to eq "Animate ☐"
+    end
+
+    it "keeps them beside when it is told to" do
+      form = Form.new actions: false, label_position: Form::LabelPosition::Left
+      form.toggle "motion", "Animate"
+
+      expect(Fixtures.render(rooted(form), 16, 2)[0]).to eq "Animate ☐"
+    end
+  end
+
+  describe "a disabled row" do
+    it "is skipped by the keyboard" do
+      form = settings
+      form.enable "bars", false
+      made = app rooted(form), 40, 10
+      Fixtures.presses made, "Down"
+
+      expect(form.focused_row.try &.key).to eq "wheel"
+    end
+
+    it "is skipped by Tab" do
+      form = settings
+      form.enable "bars", false
+      made = app rooted(form), 40, 10
+      Fixtures.presses made, "Tab"
+
+      expect(form.focused_row.try &.key).to eq "wheel"
+    end
+
+    it "is dimmed" do
+      form = settings
+      form.enable "name", false
+      buffer = Fixtures.painted rooted(form), 40, 10
+
+      expect(Fixtures.style_at(buffer, 0, 6).attributes.faint?).to be_true
+      expect(Fixtures.style_at(buffer, 8, 6).attributes.faint?).to be_true
+      expect(Fixtures.style_at(buffer, 0, 5).attributes.faint?).to be_false
+    end
+
+    it "takes the keyboard again once it is enabled" do
+      form = settings
+      form.enable "bars", false
+      form.enable "bars", true
+      made = app rooted(form), 40, 10
+      Fixtures.presses made, "Down"
+
+      expect(form.focused_row.try &.key).to eq "bars"
+    end
+  end
+
+  describe "the marks" do
+    it "spells a choice in ASCII where its dot measures two cells" do
+      wide = TermBuf::Unicode::WidthPolicy::DEFAULT.copy_with ambiguous: 2
+      form = Form.new actions: false
+      form.toggle "motion", "Animate", value: true
+      form.choice "bars", "Bars", %w[gradient bands]
+
+      expect(Fixtures.render(rooted(form), 40, 2, wide)).to eq [
+        "Animate ☑",
+        "Bars    (*) gradient  ( ) bands",
+      ]
+    end
+  end
 end

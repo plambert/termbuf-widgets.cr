@@ -7,6 +7,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `NumberField`, a field holding one integer in a range. `Left` and `Down` step down, `Right` and
+  `Up` step up, and `Home` and `End` go to the ends of the range. Typed digits are taken on `Enter`
+  and held to the range, and text that is not an integer is put back. `NumberField::Changed`
+  carries the value at every step that moves it and every accept. `#bar = true` draws a filled bar
+  beside the number. `up_down: false` leaves `Up` and `Down` to whatever contains the field.
+- `Form` can be built from a schema. `#section` adds a header and its rows, and `toggle`, `choice`,
+  `number`, `text` and `action` each add one row with a key, a label and an optional `help`. Rows
+  given outside a section go in an unnamed section at the top.
+- `Form#values` answers every row's value by key as a `Form::Value`. `form["key"]` reads one and
+  `form["key"] = value` sets it and sends nothing. `Form::Changed` carries the key and the value of
+  every change a person makes. An action row holds no value and emits `Form::Activated` with its
+  key on `Enter`, `Space` and a click.
+- `Form#enable` dims a row and takes it out of the keyboard's path. `Form#note` adds a line under
+  the row's help, for a value forced from elsewhere.
+- `examples/form.cr`, a settings form with every row kind beside a dialog form with buttons.
+
+### Changed
+
+- `Form` puts its rows in a scrolling window with a scrollbar, and the help of the row with the
+  keyboard on a line under it. `Up`, `Down`, `Home`, `End`, `PageUp` and `PageDown` move between
+  rows, and `Tab` brings the row it lands on into view. A click on a label presses the row.
+- `Form` is `Layout::Sizing.grow` tall by default. Its window is as tall as the rows when there
+  is room and scrolls when there is not.
+- A `Form` narrower than `#narrow` cells, 24 by default, puts each label above its input.
+  `#label_position` is `nil` by default and forces either side when set.
+- `Form.new actions: false` builds a form without the `Submit` and `Cancel` buttons, and without
+  submit on `Enter`. `Form#buttons` answers the button group, or `nil`.
+- `Form#values` answers typed values. The text of each row, which `Submitted` carries and the
+  form's `#rules` are asked about, is `Form#texts`.
+- `Form#add` takes an optional `help`.
+
 ## [0.11.0] - 2026-10-20
 
 This release needs termbuf 0.10, which reports the mouse in pixels where the terminal can.
