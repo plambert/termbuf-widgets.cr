@@ -245,6 +245,26 @@ Spectator.describe TermBuf::Widgets::Dialog do
       expect(order[1]).to be dialog.catcher
       expect(order[2]).to be dialog
     end
+
+    it "moves the dialog and its catcher together while it is up" do
+      ground, dialog = staged
+      dialog.open ground.app
+      dialog.z = 500
+      ground.app.frame
+
+      expect(dialog.z).to eq 500
+      expect(dialog.catcher.try(&.floating).try(&.z)).to eq 499
+      expect(dialog.floating.try(&.anchor.element)).to eq Layout::AttachPoint::Center
+      expect(ground.app.tree.roots_in_z_order.last(2)).to eq [dialog.catcher, dialog]
+    end
+
+    it "puts the catcher one below a z set before it opens" do
+      ground, dialog = staged
+      dialog.z = 50
+      dialog.open ground.app
+
+      expect(dialog.catcher.try(&.floating).try(&.z)).to eq 49
+    end
   end
 
   describe "the helpers" do

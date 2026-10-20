@@ -47,6 +47,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   the grid adds the 16 system colors, and a field edit snaps to the nearest index. `#reset_to`
   adds a "default" cell. Each change emits `ColorPicker::Changed`.
 - `examples/color.cr`, a picker with two swatches that follow it.
+- `Overlay#z=` moves an overlay to another z, open or not, and moves its catcher with it.
 
 ### Changed
 
