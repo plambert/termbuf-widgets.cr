@@ -24,6 +24,17 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `Form#enable` dims a row and takes it out of the keyboard's path. `Form#note` adds a line under
   the row's help, for a value forced from elsewhere.
 - `examples/form.cr`, a settings form with every row kind beside a dialog form with buttons.
+- `Depth`, which is `TrueColor` or `Indexed256`. It says how many colors a color widget offers.
+  At `Indexed256` a color is shown as the palette index a 256 color terminal draws.
+- `ColorSwatch`, one row with a bar in the color and its value, `#rrggbb`, with the palette index
+  after it at `Indexed256`. On a narrow row the value is written over the bar in black or white,
+  whichever reads better. On a narrower row the bar is drawn alone.
+- `ColorPicker`, a swatch, a grid of the 256 color cube and greys, and fields for red, green, blue
+  and hex. The arrows, `Enter`, `Space` and a click choose from the grid. Typing in a field moves
+  the value. `Tab` moves between the grid and the fields. At `Indexed256` the grid adds the 16
+  system colors, and a field edit snaps to the nearest index. `#reset_to` adds a "default" cell.
+  Each change emits `ColorPicker::Changed`.
+- `examples/color.cr`, a picker with two swatches that follow it.
 
 ### Changed
 
