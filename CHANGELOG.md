@@ -7,6 +7,8 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-10-20
+
 ### Added
 
 - `NumberField`, a field holding one integer in a range. `Left` and `Down` step down, `Right` and
