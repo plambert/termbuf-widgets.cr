@@ -29,7 +29,7 @@ module TermBuf::Widgets
   # A `Router` is one. A widget finds it the way it finds its tree: by walking
   # to the root, which is the only widget the mailbox is set on.
   module Mailbox
-    # Takes a message from *source*, to be delivered on the next pump.
+    # Takes a message from *source*, to be delivered on the next drain.
     abstract def post(message : Message, source : Widget) : Nil
   end
 end

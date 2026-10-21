@@ -336,10 +336,12 @@ end
 ```
 
 `Message` includes `TermBuf::Event`, so a handler answers one the same way it answers a key.
-`Widget#emit` walks up to the root's `Mailbox`, which the router sets; delivery is on the next
-`App#pump`, starting at the emitter's parent, so a widget never sees its own message in the
-dispatch that emitted it. `Router#drain` is one pass, so a pair of widgets answering each other
-cannot spin a frame.
+`Widget#emit` walks up to the root's `Mailbox`, which the router sets. Delivery is in the next
+`Router#drain`, starting at the emitter's parent, so a widget never sees its own message in the
+dispatch that emitted it. `App#pump` drains after the events it takes, so a message is heard in the
+same pump as the key that caused it. A message emitted while draining is delivered in the same
+drain, up to `Router::PASSES` rounds, so a pair of widgets answering each other cannot spin a
+frame.
 
 ## Rendering
 
@@ -459,6 +461,7 @@ pane.add notes
 | `Picture` | a picture over the cells it is given, with alt text for the terminals that draw none |
 | `Hyperlink` | text carrying an OSC 8 link, which reveals the address once the keyboard reaches it |
 | `CopyButton` | a button that copies what a block answers and flashes a label to say it did |
+| `ColorSwatch` | one color as a bar with its value beside it, written over it when the row is narrow |
 
 `Readout` is the base for a widget drawing one line it works out for itself, as against a `Label`
 drawing text it was handed.
@@ -519,6 +522,7 @@ tree = Widgets::Tree.new Widgets::Nodes.from(roots,
 | `Checkbox` | a box that is ticked or not, toggled by `Space` or a click |
 | `CheckboxGroup` | a column of boxes answering one question, with `min` and `max` on how many may be ticked |
 | `TextArea` | somewhere to type more than one line, moving by drawn row rather than by line |
+| `NumberField` | a field holding one integer in a range, stepped by the arrows, with an optional bar |
 | `ValidatedField` | a field holding its line to a list of rules, drawing the first refusal under the line |
 | `MaskedField` | a validated field drawing a mark per character, with `#value` for the text as typed |
 | `Validator` | `Proc(String, String?)`, with `required`, `length`, `matches`, `numeric`, `one_of` and `all` in `Validators` |
@@ -527,12 +531,51 @@ tree = Widgets::Tree.new Widgets::Nodes.from(roots,
 | `Combobox(T)` | a field with a selection list floating under it, narrowed by what is typed |
 | `KeywordList` | a field with the keywords already typed sitting above it as chips, which wrap as they grow |
 | `ListSelector(T)` | two lists in a `Split` with a column of buttons between them |
-| `Form` | labelled fields in a column, with the rules gathered in one place and a `#submit` that asks them all |
+| `Form` | sections of labeled rows in a scrolling window, built from a schema or by hand, with optional buttons |
+| `ColorPicker` | a swatch, a grid of the palette's colors, and fields for red, green, blue and hex |
 
 Each of them says what happened to it with a `Message` and knows nothing about what that means. A
 disabled control is out of the tab order and answers nothing, but is still drawn: one that vanishes
 when it cannot be used tells the user less than one that is visibly unavailable. A group that
 refuses a toggle puts it back and says `Refused` rather than `Changed`.
+
+A settings form is described as data. The rows are `toggle`, `choice`, `number`, `text`, `color`
+and `action`. Each has a key, a label and an optional help line, and the form answers `#values` by
+key, typed as `Bool`, `Int32`, `String` or `Color`. Every change a person makes emits
+`Form::Changed` with the key and the value. An `action` row holds nothing and emits
+`Form::Activated` when it is pressed. A `color` row draws a `ColorSwatch`, and `Enter` opens a
+`ColorPicker` under it, or in a dialog when there is no room. Each change in the picker applies at
+once, `Enter` keeps it and `Escape` puts the color back. The picker opens over the screen, so a
+form with color rows is handed the app with `form.attach app`. `Form.new depth:` sets the `Depth`
+every color row offers.
+
+```crystal
+form = Widgets::Form.new actions: false
+form.section "Display" do |section|
+  section.toggle "motion", "Animate the panels", value: true, help: "Off draws the end state."
+  section.choice "bars", "Bar color", %w[gradient bands], value: "gradient"
+end
+form.section "Input" do |section|
+  section.number "wheel", "Cells per wheel notch", value: 3, range: 1..10
+  section.text "name", "Tester name", value: "anonymous"
+  section.color "accent", "Accent", TermBuf::Color.rgb(0x3080C0)
+  section.action "keys", "Key bindings", hint: "Enter to open"
+end
+form["motion"] = false # sets it and sends nothing
+form.attach app        # the color row's picker opens on the app's screen
+```
+
+The rows scroll in their own window, `Up` and `Down` move between them, and the help of the row
+with the keyboard shows under the window. A form narrower than `#narrow` puts its labels above the
+inputs. `form.enable "key", false` dims a row and takes it out of the tab order. A letter bound on
+the form, such as `j`, still types into a text row. A host that binds letters around the form
+checks `form.typing?`, or calls `form.type context` to hand the key to the row, before it acts on
+one.
+
+A form grows to the height its parent has left, as every scrolling widget does. Inside a parent
+sized to fit, such as an overlay sized to its content, give it `height: Layout::Sizing.fit`, or it
+shrinks to its first row. A form built by hand with `#add` keeps its `Submit` and `Cancel` buttons
+and the rules gathered in one place:
 
 ```crystal
 form = Widgets::Form.new
@@ -548,6 +591,19 @@ thing: `Option.all` labels each value by `#to_s`, and `Option.new("ssh", 22)` sa
 speaking the kitty keyboard protocol can report `Ctrl+Enter`: `Enter` is the byte `0x0D` and
 control does not change it. `TextArea.default_accept_keys` is therefore both `Ctrl+Enter` and
 `Alt+Enter`, and `#accept_keys` takes whatever an application would rather use.
+
+`ColorSwatch` and `ColorPicker` each take a `Depth`. `Depth::TrueColor` offers every 24 bit color.
+`Depth::Indexed256` offers the 256 color palette and shows a color the way a terminal without true
+color draws it, which is the index `Color#to_indexed256` picks. A swatch at that depth writes the
+index after the hex value. A picker at that depth holds a palette index as its value, and a field
+edit moves to the nearest index. The picker emits `ColorPicker::Changed` for each change, and the
+application decides which change is final.
+
+```crystal
+picker = Widgets::ColorPicker.new TermBuf::Color.rgb(0x3080C0),
+  depth: Widgets::Depth::Indexed256
+picker.reset_to = TermBuf::Color.rgb(0xC0C0C0)
+```
 
 ### Navigation
 

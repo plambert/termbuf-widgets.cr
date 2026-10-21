@@ -175,6 +175,15 @@ module TermBuf::Widgets
       @floating.try(&.z) || 0
     end
 
+    # Moves the overlay to *z*, keeping where it is anchored, and moves the
+    # catcher to one below it. Works while the overlay is up.
+    def z=(z : Int32) : Int32
+      held = @floating
+      self.floating = held ? held.copy_with(z: z) : Layout::Floating.on(nil, z: z)
+      @catcher.try &.z=(z - 1)
+      z
+    end
+
     # What everything painted below the overlay is dimmed with, or `nil` for
     # one that is down or that leaves the screen alone.
     #

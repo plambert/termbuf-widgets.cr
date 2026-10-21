@@ -172,7 +172,8 @@ module TermBuf::Widgets
     end
 
     # Takes everything waiting on the channel, without blocking, and answers
-    # how many events that was.
+    # how many events that was. The messages those events caused are
+    # delivered before it returns.
     def pump : Int32
       handled = @router.drain
 
@@ -181,7 +182,7 @@ module TermBuf::Widgets
         deliver event
       end
 
-      handled
+      handled + @router.drain
     end
 
     # Waits for something to happen, answers it, and takes anything else that

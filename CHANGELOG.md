@@ -7,6 +7,78 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `NumberField`, a field holding one integer in a range. `Left` and `Down` step down, `Right` and
+  `Up` step up, and `Home` and `End` go to the ends of the range. Typed digits are taken on `Enter`
+  and held to the range, and text that is not an integer is put back. `NumberField::Changed`
+  carries the value at every step that moves it and every accept. `#bar = true` draws a filled bar
+  beside the number. `up_down: false` leaves `Up` and `Down` to whatever contains the field.
+  `#typing` is called after every edit with the typed number, or `nil` when the text is not a
+  whole number in the range.
+- `Form` can be built from a schema. `#section` adds a header and its rows, and `toggle`, `choice`,
+  `number`, `text`, `color` and `action` each add one row with a key, a label and an optional
+  `help`. Rows given outside a section go in an unnamed section at the top.
+- A `color` row draws a `ColorSwatch`. `Enter`, `Space` and a click open a `ColorPicker` in a
+  popover under the row, or in a dialog when the popover fits neither under nor over it. Each
+  change applies at once and emits `Form::Changed`. `Enter` closes the picker and keeps the color,
+  and `Escape` closes it and puts back the color it opened on. `Form.new depth:` sets the `Depth`
+  for every color row, and `depth:` on the row overrides it. A form with color rows needs
+  `Form#attach app`. The picker opens above every overlay the form sits in. `Form.new picker_z:`
+  and `picker_z:` on the row set the z it opens at instead.
+- `Form#values` answers every row's value by key as a `Form::Value`. `form["key"]` reads one and
+  `form["key"] = value` sets it and sends nothing. `Form::Changed` carries the key and the value of
+  every change a person makes. An action row holds no value and emits `Form::Activated` with its
+  key on `Enter`, `Space` and a click.
+- `Form#typing?` says whether the row with the keyboard takes free text, and `Form#types?` whether
+  it takes a given key. `Form#type` hands the key being answered to that row and says whether it
+  did, for a host that binds letters around the form.
+- `Enter` on a toggle row toggles it and `Enter` on a choice row moves it on one, as `Space` does.
+- `Form#enable` dims a row and takes it out of the keyboard's path. `Form#note` adds a line under
+  the row's help, for a value forced from elsewhere.
+- `examples/form.cr`, a settings form with every row kind beside a dialog form with buttons.
+- `Depth`, which is `TrueColor` or `Indexed256`. It says how many colors a color widget offers.
+  At `Indexed256` a color is shown as the palette index a 256 color terminal draws.
+- `ColorSwatch`, one row with a bar in the color and its value, `#rrggbb`, with the palette index
+  after it at `Indexed256`. On a narrow row the value is written over the bar in black or white,
+  whichever reads better. On a narrower row the bar is drawn alone.
+- `ColorPicker`, a swatch, a grid of the 256 color cube and greys, a `NumberField` each for red,
+  green and blue, and a hex field. The arrows, `Enter`, `Space` and a click choose from the grid.
+  Typing in a field moves the value. `Tab` moves between the grid and the fields. At `Indexed256`
+  the grid adds the 16 system colors, and a field edit snaps to the nearest index. `#reset_to`
+  adds a "default" cell. Each change emits `ColorPicker::Changed`.
+- `examples/color.cr`, a picker with two swatches that follow it.
+- `Overlay#z=` moves an overlay to another z, open or not, and moves its catcher with it.
+
+### Changed
+
+- `Form` puts its rows in a scrolling window with a scrollbar, and the help of the row with the
+  keyboard under it, wrapped to the width. The help takes as many rows as the longest help of any
+  row, so the window does not move with the keyboard. `Up`, `Down`, `Home`, `End`, `PageUp` and
+  `PageDown` move between rows, and `Tab` brings the row it lands on into view. A click on a label
+  presses the row.
+- `Form` is `Layout::Sizing.grow` tall by default. Its window is as tall as the rows when there
+  is room and scrolls when there is not. A form inside a parent sized to fit needs
+  `height: Layout::Sizing.fit`, or it shrinks to its first row.
+- A `Form` narrower than `#narrow` cells, 24 by default, puts each label above its input.
+  `#label_position` is `nil` by default and forces either side when set.
+- A `Form` label column beside the inputs takes at most `#label_share` percent of the width, 40 by
+  default, and never less than the widest word of any label. A longer label wraps onto more lines,
+  and so does a label above its input that is wider than the form. `Form.new` takes
+  `label_share:` and `label_width:`, and `label_share: nil` squares the column to the widest
+  label.
+- `Form.new actions: false` builds a form without the `Submit` and `Cancel` buttons, and without
+  submit on `Enter`. `Form#buttons` answers the button group, or `nil`.
+- `Form#values` answers typed values. The text of each row, which `Submitted` carries and the
+  form's `#rules` are asked about, is `Form#texts`.
+- `Form#add` takes an optional `help`.
+- A binding on the form's own keymap for a printable key is skipped while the row with the
+  keyboard takes that key as text, so a letter bound for moving between rows still types into a
+  text row.
+- `Router#drain` delivers the messages its own handlers emit in the same drain, for up to
+  `Router::PASSES` rounds, and `App#pump` drains again after the events it takes. A widget that
+  answers another's message, such as `Form` sending `Form::Changed`, is heard on the same key.
+
 ## [0.11.0] - 2026-10-20
 
 This release needs termbuf 0.10, which reports the mouse in pixels where the terminal can.

@@ -185,9 +185,9 @@ module TermBuf::Widgets
     # Says *toast* has gone.
     #
     # Sent from the container rather than from the toast, because a message is
-    # delivered on the next pump and starts at the emitter's parent: a toast
-    # that has already been taken out of the stack has none, and nothing would
-    # hear it.
+    # delivered after the handler returns and starts at the emitter's parent.
+    # A toast that has already been taken out of the stack has no parent, and
+    # nothing would hear it.
     private def announce(toast : Toast) : Nil
       @container.emit Toast::Dismissed.new toast
     end

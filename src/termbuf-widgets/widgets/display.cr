@@ -23,6 +23,8 @@
 #   when you look at it.
 # * `TermBuf::Widgets::CopyButton` — a button that puts something on the
 #   clipboard and says it did.
+# * `TermBuf::Widgets::ColorSwatch` — one color as a bar, and its value
+#   beside it or over it.
 #
 # Most of them are leaves: each says how wide it wants to be, how tall it turns
 # out at that width, and draws into the box the layout gave it. None owns a
@@ -47,3 +49,4 @@ require "./display/single_value"
 require "./display/formatted_number"
 require "./display/bytes_display"
 require "./display/rating"
+require "./display/color_swatch"
